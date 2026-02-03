@@ -1,0 +1,20 @@
+import { Lights } from './Lights'
+import { Ground } from '../world/Ground'
+import { Character } from '../character/Character'
+import { CameraController } from './Camera'
+import { useWorldPosition } from './WorldContext'
+
+export function Scene() {
+  const { worldPosition } = useWorldPosition()
+
+  return (
+    <>
+      <CameraController />
+      <group position={[worldPosition.x, worldPosition.y, worldPosition.z]}>
+        <Lights />
+        <Ground />
+        <Character />
+      </group>
+    </>
+  )
+}
