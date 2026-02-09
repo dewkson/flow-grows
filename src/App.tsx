@@ -7,7 +7,8 @@ function App() {
     <Canvas
       shadows
       dpr={[1, 2]}
-      camera={{ position: [0, 5, 8] }}
+      orthographic
+      camera={{ position: [5, 5 / Math.sqrt(2), 5], zoom: 50 }}
       style={{ width: '100vw', height: '100vh', display: 'block' }}
     >
       <WorldProvider>
