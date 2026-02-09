@@ -10,8 +10,8 @@ export function Scene() {
   return (
     <>
       <CameraController />
+      <Lights />
       <group position={[worldPosition.x, worldPosition.y, worldPosition.z]}>
-        <Lights />
         <Ground />
         <Character />
       </group>
