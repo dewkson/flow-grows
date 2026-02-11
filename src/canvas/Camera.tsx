@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { useThree } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { HALF_GROUND, WALL_THICKNESS } from '../world/constants'
 
 export function CameraController() {
   const { camera } = useThree()
@@ -10,7 +11,6 @@ export function CameraController() {
   // Configure orthographic camera clipping planes
   useEffect(() => {
     if (camera instanceof THREE.OrthographicCamera) {
-      // eslint-disable-next-line react-hooks/immutability
       Object.assign(camera, { near: -1000, far: 1000 })
       camera.updateProjectionMatrix()
     }
@@ -61,6 +61,30 @@ export function CameraController() {
       window.removeEventListener('mouseup', handleMouseUp)
     }
   }, [camera])
+
+  // Elastic lerp-back: if the camera's ground-projected center is outside
+  // the allowed area, smoothly pull it back inside.
+  const CAM_OFFSET = 5
+  const CAMERA_BOUND = HALF_GROUND - WALL_THICKNESS / 2
+  const RETURN_SPEED = 0.12
+
+  useFrame(() => {
+    const targetX =
+      THREE.MathUtils.clamp(
+        camera.position.x - CAM_OFFSET,
+        -CAMERA_BOUND,
+        CAMERA_BOUND,
+      ) + CAM_OFFSET
+    const targetZ =
+      THREE.MathUtils.clamp(
+        camera.position.z - CAM_OFFSET,
+        -CAMERA_BOUND,
+        CAMERA_BOUND,
+      ) + CAM_OFFSET
+
+    camera.position.x += (targetX - camera.position.x) * RETURN_SPEED // eslint-disable-line react-hooks/immutability
+    camera.position.z += (targetZ - camera.position.z) * RETURN_SPEED
+  })
 
   return null
 }
