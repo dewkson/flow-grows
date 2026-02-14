@@ -13,5 +13,5 @@ export const WALL_THICKNESS = 0.3
 /** Radius of the player character sphere */
 export const CHARACTER_RADIUS = 1
 
-/** Max distance the character center can be from origin (stays inside walls) */
-export const CHARACTER_BOUND = HALF_GROUND - WALL_THICKNESS / 2 - CHARACTER_RADIUS
+/** Max distance the character center can be from origin */
+export const CHARACTER_BOUND = HALF_GROUND - CHARACTER_RADIUS
