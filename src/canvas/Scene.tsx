@@ -4,6 +4,7 @@ import { Character } from '../character/Character'
 import { CameraController } from './Camera'
 import { useWorldPosition } from './WorldContext'
 import { WorldContentManager } from '../content/WorldContentManager'
+import { GardenModels } from '../models/GardenModels'
 
 export function Scene() {
   const { worldPosition } = useWorldPosition()
@@ -14,6 +15,7 @@ export function Scene() {
       <Lights />
       <group position={[worldPosition.x, worldPosition.y, worldPosition.z]}>
         <Ground />
+        <GardenModels />
         <Character />
         <WorldContentManager />
       </group>
