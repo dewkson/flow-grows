@@ -9,6 +9,8 @@ function App() {
       dpr={[1, 2]}
       orthographic
       camera={{ position: [5, 5 / Math.sqrt(2), 5], zoom: 50 }}
+      gl={{ clearColor: '#e7e7e7' }}       {/* oder: */}
+      scene={{ background: new THREE.Color('#1a1a2e') }}
       style={{ width: '100vw', height: '100vh', display: 'block' }}
     >
       <WorldProvider>

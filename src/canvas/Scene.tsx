@@ -11,6 +11,7 @@ export function Scene() {
 
   return (
     <>
+      <color attach="background" args={['#9e9e9e']} />
       <CameraController />
       <Lights />
       <group position={[worldPosition.x, worldPosition.y, worldPosition.z]}>
