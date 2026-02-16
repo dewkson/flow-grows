@@ -45,7 +45,7 @@ export function GardenModels() {
       {/*<Grass position={[-4, 0, -3]} /> */}
 
       {/* 2D Sprite auf dem Boden */}
-      <GroundSprite position={[0, 0, 0]} url="/sprites/origin-tree.png" scale={30} />
+      <GroundSprite position={[0, 0, 0]} url="/sprites/origin-tree-transparent.png" scale={30} />
     </>
   )
 }
