@@ -49,7 +49,7 @@ export function GardenModels() {
 
       {/* 2D Sprite auf dem Boden */}
       <GroundSprite position={[0, 0, 0]} url="/sprites/origin-tree-transparent.png" scale={30} />
-      <GroundSprite position={[-30, 0, 30]} url="/sprites/music-production-area-transparent.png" scale={20} />
+      <GroundSprite position={[-50, 0, -50]} url="/sprites/music-production-area-transparent.png" scale={20} />
     </>
   )
 }

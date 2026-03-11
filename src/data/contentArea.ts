@@ -17,7 +17,7 @@ export const contentAreas: ContentArea[] = [
   {
     id: 'welcome-text',
     title: 'Welcome!',
-    description: '... to my digital garden.\nExplore and discover what grows here.',
+    description: 'Willkommen in meinem digitalen Garten.\nErkunde und entdecke, was hier wächst.\n\nKlicke hier, um diesen Text zu bearbeiten.',
     worldPosition: [20, 0.12, 20],
     rotation: [0, Math.PI / 4, 0],
     contentType: 'text',
@@ -30,10 +30,9 @@ export const contentAreas: ContentArea[] = [
     description: 'A challenging puzzle awaits.\nCan you solve it?',
     worldPosition: [-20, 0.12, 20],
     rotation: [0, Math.PI / 4, 0],
-    contentType: 'game',
+    contentType: 'text',
     interactionRadius: 6,
-    unlocked: false,
-    unlockCondition: 'Complete the welcome quest',
+    unlocked: true,
   },
   {
     id: 'workshop-sign',
@@ -41,9 +40,8 @@ export const contentAreas: ContentArea[] = [
     description: 'Build and experiment\nwith new ideas.',
     worldPosition: [20, 0.12, -20],
     rotation: [0, Math.PI / 4, 0],
-    contentType: 'embed',
+    contentType: 'text',
     interactionRadius: 6,
-    unlocked: false,
-    unlockCondition: 'Complete the welcome quest',
+    unlocked: true,
   },
 ]

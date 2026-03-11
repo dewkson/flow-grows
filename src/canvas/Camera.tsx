@@ -2,11 +2,20 @@ import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { HALF_GROUND, WALL_THICKNESS } from '../world/constants'
+import { useGardenStore } from '../store/gardenStore'
 
 export function CameraController() {
   const { camera } = useThree()
   const isDragging = useRef(false)
   const previousMousePosition = useRef({ x: 0, y: 0 })
+  const isEditingTextRef = useRef(false)
+
+  // Keep a ref in sync with the store so event handlers see the latest value
+  useEffect(() => {
+    return useGardenStore.subscribe(
+      (state) => { isEditingTextRef.current = state.isEditingText },
+    )
+  }, [])
 
   // Configure orthographic camera clipping planes
   useEffect(() => {
@@ -18,6 +27,7 @@ export function CameraController() {
 
   useEffect(() => {
     const handleMouseDown = (e: MouseEvent) => {
+      if (isEditingTextRef.current) return
       isDragging.current = true
       previousMousePosition.current = { x: e.clientX, y: e.clientY }
     }

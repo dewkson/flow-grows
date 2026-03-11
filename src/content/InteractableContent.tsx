@@ -4,6 +4,7 @@ import type { ContentArea } from '../data/contentArea'
 import { characterPosition } from '../character/characterPosition'
 import { useGardenStore } from '../store/gardenStore'
 import { TextContent } from './TextContent'
+import { EditableTextPanel } from './EditableTextPanel'
 import { ContentZone } from './ContentZone'
 
 type InteractableContentProps = {
@@ -51,6 +52,7 @@ function renderContent(
 ) {
   switch (data.contentType) {
     case 'text':
+      return <EditableTextPanel data={data} isNearby={isNearby} />
     case 'game':
     case 'embed':
     case 'interactive':
