@@ -6,21 +6,24 @@ function GroundSprite({
   position,
   url,
   scale = 3,
+  stretchFactor = 2, // Anpassen je nach Kamerawinkel
 }: {
   position: [number, number, number]
   url: string
   scale?: number
+  stretchFactor?: number
 }) {
   const texture = useTexture(url)
 
   return (
     <mesh
       position={[position[0], 0.01, position[2]]}
-      rotation={[-Math.atan(0.5), Math.PI / 4, Math.PI/10]}
+      rotation={[-Math.PI / 2, 0, Math.PI / 4]} // Rotation um Z entfernt!
       renderOrder={1}
       receiveShadow
     >
-      <planeGeometry args={[scale, scale]} />
+      {/* Breite bleibt gleich, Höhe wird gestreckt */}
+      <planeGeometry args={[scale, scale * stretchFactor]} />
       <meshStandardMaterial
         map={texture}
         transparent={true}
@@ -46,6 +49,7 @@ export function GardenModels() {
 
       {/* 2D Sprite auf dem Boden */}
       <GroundSprite position={[0, 0, 0]} url="/sprites/origin-tree-transparent.png" scale={30} />
+      <GroundSprite position={[-30, 0, 30]} url="/sprites/music-production-area-transparent.png" scale={20} />
     </>
   )
 }

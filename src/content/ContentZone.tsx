@@ -8,8 +8,8 @@ type ContentZoneProps = {
   position?: [number, number, number]
 }
 
-const ZONE_COLOR_IDLE = new THREE.Color('#4499ff')
-const ZONE_COLOR_ACTIVE = new THREE.Color('#44ff88')
+const ZONE_COLOR_IDLE = new THREE.Color('#209b4d')
+const ZONE_COLOR_ACTIVE = new THREE.Color('#17d102')
 
 export function ContentZone({
   radius,

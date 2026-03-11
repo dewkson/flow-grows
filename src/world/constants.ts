@@ -1,5 +1,5 @@
 /** Size of the ground plane (square) */
-export const GROUND_SIZE = 50
+export const GROUND_SIZE = 100
 
 /** Half the ground size – used for boundary clamping */
 export const HALF_GROUND = GROUND_SIZE / 2
