@@ -7,11 +7,17 @@ function GroundSprite({
   url,
   scale = 3,
   stretchFactor = 2, // Anpassen je nach Kamerawinkel
+  renderOrder = 1,
+  depthTest = true,
+  receiveShadow = true,
 }: {
   position: [number, number, number]
   url: string
   scale?: number
   stretchFactor?: number
+  renderOrder?: number
+  depthTest?: boolean
+  receiveShadow?: boolean
 }) {
   const texture = useTexture(url)
 
@@ -19,8 +25,8 @@ function GroundSprite({
     <mesh
       position={[position[0], 0.01, position[2]]}
       rotation={[-Math.PI / 2, 0, Math.PI / 4]} // Rotation um Z entfernt!
-      renderOrder={1}
-      receiveShadow
+      renderOrder={renderOrder}
+      receiveShadow={receiveShadow}
     >
       {/* Breite bleibt gleich, Höhe wird gestreckt */}
       <planeGeometry args={[scale, scale * stretchFactor]} />
@@ -29,6 +35,7 @@ function GroundSprite({
         transparent={true}
         alphaTest={0.5}
         depthWrite={false}
+        depthTest={depthTest}
         side={THREE.DoubleSide}
         polygonOffset
         polygonOffsetFactor={-1}
@@ -49,7 +56,8 @@ export function GardenModels() {
 
       {/* 2D Sprite auf dem Boden */}
       <GroundSprite position={[0, 0, 0]} url="/sprites/origin-tree-transparent.png" scale={30} />
-      <GroundSprite position={[-50, 0, -50]} url="/sprites/music-production-area-transparent.png" scale={20} />
+      <GroundSprite position={[0, 0, 0]} url="/sprites/origin-tree-solo.png" scale={30} renderOrder={3} depthTest={false} receiveShadow={false} />
+      <GroundSprite position={[-52, 0, -52]} url="/sprites/music-production-area-transparent.png" scale={20} />
     </>
   )
 }

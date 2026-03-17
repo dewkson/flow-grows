@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { Scene } from './canvas/Scene'
 import { WorldProvider } from './canvas/WorldContext'
 import { ModeToggle } from './ui/ModeToggle'
+import { ColliderPanel } from './ui/ColliderPanel'
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
         </WorldProvider>
       </Canvas>
       <ModeToggle />
+      <ColliderPanel />
     </>
   )
 }

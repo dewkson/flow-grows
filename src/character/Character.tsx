@@ -2,7 +2,9 @@ import { useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { characterPosition } from './characterPosition'
+import { resolveCollisions } from './collision'
 import { CHARACTER_BOUND } from '../world/constants'
+import { useGardenStore } from '../store/gardenStore'
 
 /** Initial camera XZ offset – must match the value in App.tsx */
 const INITIAL_CAM_X = 5
@@ -34,6 +36,16 @@ export function Character() {
     // Lerp only X and Z – Y (height above ground) stays constant
     meshRef.current.position.x += (targetX - meshRef.current.position.x) * LERP_SPEED
     meshRef.current.position.z += (targetZ - meshRef.current.position.z) * LERP_SPEED
+
+    // Resolve collisions with placed colliders
+    const colliders = useGardenStore.getState().colliders
+    const [resolvedX, resolvedZ] = resolveCollisions(
+      meshRef.current.position.x,
+      meshRef.current.position.z,
+      colliders,
+    )
+    meshRef.current.position.x = resolvedX
+    meshRef.current.position.z = resolvedZ
 
     // Expose actual position for other systems
     characterPosition.copy(meshRef.current.position)

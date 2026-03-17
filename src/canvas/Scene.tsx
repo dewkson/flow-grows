@@ -5,6 +5,7 @@ import { CameraController } from './Camera'
 import { useWorldPosition } from './WorldContext'
 import { WorldContentManager } from '../content/WorldContentManager'
 import { GardenModels } from '../models/GardenModels'
+import { ColliderSystem } from '../world/ColliderSystem'
 
 export function Scene() {
   const { worldPosition } = useWorldPosition()
@@ -19,6 +20,7 @@ export function Scene() {
         <GardenModels />
         <Character />
         <WorldContentManager />
+        <ColliderSystem />
       </group>
     </>
   )
