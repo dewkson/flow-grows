@@ -1,5 +1,7 @@
 export type ContentType = 'text' | 'game' | 'embed' | 'interactive'
 
+export type EmbedVariant = 'soundcloud' | 'itchio'
+
 export type ContentArea = {
   id: string
   title: string
@@ -11,6 +13,8 @@ export type ContentArea = {
   interactionRadius?: number
   unlocked: boolean
   unlockCondition?: string
+  embedUrls?: string[]
+  embedVariant?: EmbedVariant
 }
 
 export const contentAreas: ContentArea[] = [
@@ -35,13 +39,27 @@ export const contentAreas: ContentArea[] = [
     unlocked: true,
   },
   {
-    id: 'workshop-sign',
-    title: 'Workshop',
-    description: 'Build and experiment\nwith new ideas.',
-    worldPosition: [20, 0.12, -20],
+    id: 'music-monitor',
+    title: 'Music Production',
+    description: 'Listen to my SoundCloud tracks.',
+    worldPosition: [-40, 0.12, -40],
     rotation: [0, Math.PI / 4, 0],
-    contentType: 'text',
-    interactionRadius: 6,
+    contentType: 'embed',
+    interactionRadius: 10,
     unlocked: true,
+    embedUrls: [],
+    embedVariant: 'soundcloud',
+  },
+  {
+    id: 'game-dev-monitor',
+    title: 'Game Dev',
+    description: 'Play my itch.io games.',
+    worldPosition: [30, 0.12, -30],
+    rotation: [0, Math.PI / 4, 0],
+    contentType: 'embed',
+    interactionRadius: 12,
+    unlocked: true,
+    embedUrls: [],
+    embedVariant: 'itchio',
   },
 ]

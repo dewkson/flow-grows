@@ -10,10 +10,15 @@ export function CameraController() {
   const previousMousePosition = useRef({ x: 0, y: 0 })
   const isEditingTextRef = useRef(false)
 
-  // Keep a ref in sync with the store so event handlers see the latest value
+  const isEmbedOpenRef = useRef(false)
+
+  // Keep refs in sync with the store so event handlers see the latest value
   useEffect(() => {
     return useGardenStore.subscribe(
-      (state) => { isEditingTextRef.current = state.isEditingText },
+      (state) => {
+        isEditingTextRef.current = state.isEditingText
+        isEmbedOpenRef.current = state.isEmbedOpen
+      },
     )
   }, [])
 
@@ -27,7 +32,7 @@ export function CameraController() {
 
   useEffect(() => {
     const handleMouseDown = (e: MouseEvent) => {
-      if (isEditingTextRef.current) return
+      if (isEditingTextRef.current || isEmbedOpenRef.current) return
       isDragging.current = true
       previousMousePosition.current = { x: e.clientX, y: e.clientY }
     }

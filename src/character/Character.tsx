@@ -20,6 +20,12 @@ export function Character() {
   useFrame(() => {
     if (!meshRef.current) return
 
+    // Freeze movement when embed panel is open
+    if (useGardenStore.getState().isEmbedOpen) {
+      characterPosition.copy(meshRef.current.position)
+      return
+    }
+
     // The camera's ground-center is its XZ position minus the initial offset,
     // clamped so the sphere stays inside the walls (accounting for radius + wall thickness)
     const targetX = THREE.MathUtils.clamp(

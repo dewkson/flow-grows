@@ -21,6 +21,13 @@ function GroundSprite({
 }) {
   const texture = useTexture(url)
 
+  // Schärfere Darstellung: kein Mipmap-Blur, anisotropes Filtering für schräge Ansicht
+  texture.minFilter = THREE.LinearFilter
+  texture.magFilter = THREE.LinearFilter
+  texture.generateMipmaps = false
+  texture.anisotropy = 16
+  texture.colorSpace = THREE.SRGBColorSpace
+
   return (
     <mesh
       position={[position[0], 0.01, position[2]]}
@@ -39,6 +46,7 @@ function GroundSprite({
         side={THREE.DoubleSide}
         polygonOffset
         polygonOffsetFactor={-1}
+        toneMapped={false}
       />
     </mesh>
   )
@@ -58,6 +66,8 @@ export function GardenModels() {
       <GroundSprite position={[0, 0, 0]} url="/sprites/origin-tree-transparent.png" scale={30} />
       <GroundSprite position={[0, 0, 0]} url="/sprites/origin-tree-solo.png" scale={30} renderOrder={3} depthTest={false} receiveShadow={false} />
       <GroundSprite position={[-52, 0, -52]} url="/sprites/music-production-area-transparent.png" scale={20} />
+      <GroundSprite position={[-20, 0, 0]} url="/sprites/path-isles.png" scale={20} />
+      <GroundSprite position={[30, 0, -30]} url="/sprites/game-dev-area.png" scale={30} />
     </>
   )
 }

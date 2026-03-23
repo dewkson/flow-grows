@@ -4,6 +4,7 @@ import { Scene } from './canvas/Scene'
 import { WorldProvider } from './canvas/WorldContext'
 import { ModeToggle } from './ui/ModeToggle'
 import { ColliderPanel } from './ui/ColliderPanel'
+import { EmbedPanel } from './content/EmbedPanel'
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
       </Canvas>
       <ModeToggle />
       <ColliderPanel />
+      <EmbedPanel />
     </>
   )
 }
