@@ -1,5 +1,5 @@
-import { useRef, useState, useCallback } from 'react'
-import { useThree, type ThreeEvent } from '@react-three/fiber'
+import { useRef, useState, useCallback, useEffect } from 'react'
+import { type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGardenStore } from '../store/gardenStore'
 import type { Collider } from '../data/collider'
@@ -14,30 +14,20 @@ function ColliderBox({ data }: { data: Collider }) {
   const selectCollider = useGardenStore((s) => s.selectCollider)
   const updateCollider = useGardenStore((s) => s.updateCollider)
   const removeCollider = useGardenStore((s) => s.removeCollider)
+  const setCameraDragLocked = useGardenStore((s) => s.setCameraDragLocked)
 
   const isSelected = selectedId === data.id
   const visible = editorMode
 
   const [dragging, setDragging] = useState<null | 'move' | 'x+' | 'x-' | 'z+' | 'z-'>(null)
   const dragStart = useRef<{ pointerX: number; pointerZ: number; origPos: [number, number]; origSize: [number, number] } | null>(null)
-  const { camera, raycaster, gl } = useThree()
-
   const groundPlane = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0))
 
-  const getGroundPoint = useCallback(
-    (event: PointerEvent) => {
-      const rect = gl.domElement.getBoundingClientRect()
-      const mouse = new THREE.Vector2(
-        ((event.clientX - rect.left) / rect.width) * 2 - 1,
-        -((event.clientY - rect.top) / rect.height) * 2 + 1,
-      )
-      raycaster.setFromCamera(mouse, camera)
-      const hit = new THREE.Vector3()
-      raycaster.ray.intersectPlane(groundPlane.current, hit)
-      return hit
-    },
-    [camera, raycaster, gl],
-  )
+  useEffect(() => {
+    return () => {
+      setCameraDragLocked(false)
+    }
+  }, [setCameraDragLocked])
 
   const onPointerDown = useCallback(
     (handle: 'move' | 'x+' | 'x-' | 'z+' | 'z-') =>
@@ -45,16 +35,22 @@ function ColliderBox({ data }: { data: Collider }) {
         if (!editorMode) return
         e.stopPropagation()
         selectCollider(data.id)
+        setCameraDragLocked(true)
+
+        const hit = new THREE.Vector3()
+        e.ray.intersectPlane(groundPlane.current, hit)
+
         setDragging(handle)
         dragStart.current = {
-          pointerX: e.point.x,
-          pointerZ: e.point.z,
+          pointerX: hit.x,
+          pointerZ: hit.z,
           origPos: [...data.position],
           origSize: [...data.size],
         }
-        gl.domElement.setPointerCapture(e.pointerId)
+        const target = e.target as (EventTarget & { setPointerCapture?: (id: number) => void }) | null
+        target?.setPointerCapture?.(e.pointerId)
       },
-    [editorMode, data.id, data.position, data.size, selectCollider, gl],
+    [editorMode, data.id, data.position, data.size, selectCollider, setCameraDragLocked],
   )
 
   const onPointerMove = useCallback(
@@ -62,7 +58,8 @@ function ColliderBox({ data }: { data: Collider }) {
       if (!dragging || !dragStart.current) return
       e.stopPropagation()
 
-      const hit = getGroundPoint(e.nativeEvent)
+      const hit = new THREE.Vector3()
+      e.ray.intersectPlane(groundPlane.current, hit)
       const dx = hit.x - dragStart.current.pointerX
       const dz = hit.z - dragStart.current.pointerZ
       const { origPos, origSize } = dragStart.current
@@ -95,7 +92,7 @@ function ColliderBox({ data }: { data: Collider }) {
         })
       }
     },
-    [dragging, data.id, getGroundPoint, updateCollider],
+    [dragging, data.id, updateCollider],
   )
 
   const onPointerUp = useCallback(
@@ -104,9 +101,11 @@ function ColliderBox({ data }: { data: Collider }) {
       e.stopPropagation()
       setDragging(null)
       dragStart.current = null
-      gl.domElement.releasePointerCapture(e.pointerId)
+      setCameraDragLocked(false)
+      const target = e.target as (EventTarget & { releasePointerCapture?: (id: number) => void }) | null
+      target?.releasePointerCapture?.(e.pointerId)
     },
-    [dragging, gl],
+    [dragging, setCameraDragLocked],
   )
 
   if (!visible) return null

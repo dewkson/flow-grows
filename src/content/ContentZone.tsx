@@ -33,7 +33,7 @@ export function ContentZone({
 
   return (
     <mesh position={position} rotation={[-Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[radius * 0.85, radius, 48]} />
+      <circleGeometry args={[radius, 48]} />
       <meshStandardMaterial
         ref={matRef}
         transparent

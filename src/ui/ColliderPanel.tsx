@@ -4,6 +4,8 @@ import { characterPosition } from '../character/characterPosition'
 
 export function ColliderPanel() {
   const editorMode = useGardenStore((s) => s.editorMode)
+  const activeEditorPanel = useGardenStore((s) => s.activeEditorPanel)
+  const setActiveEditorPanel = useGardenStore((s) => s.setActiveEditorPanel)
   const colliders = useGardenStore((s) => s.colliders)
   const selectedId = useGardenStore((s) => s.selectedColliderId)
   const addCollider = useGardenStore((s) => s.addCollider)
@@ -11,7 +13,7 @@ export function ColliderPanel() {
   const updateCollider = useGardenStore((s) => s.updateCollider)
   const selectCollider = useGardenStore((s) => s.selectCollider)
 
-  if (!editorMode) return null
+  if (!editorMode || activeEditorPanel !== 'colliders') return null
 
   const selected = colliders.find((c) => c.id === selectedId)
 
@@ -25,6 +27,7 @@ export function ColliderPanel() {
 
   return (
     <div
+      data-no-camera-drag="true"
       style={{
         position: 'fixed',
         bottom: 16,
@@ -45,21 +48,38 @@ export function ColliderPanel() {
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <strong style={{ fontSize: 14 }}>Colliders ({colliders.length})</strong>
-        <button
-          onClick={handleAdd}
-          style={{
-            background: '#ff8800',
-            border: 'none',
-            borderRadius: 6,
-            color: '#fff',
-            padding: '4px 12px',
-            cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: 12,
-          }}
-        >
-          + Hinzufügen
-        </button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            onClick={handleAdd}
+            style={{
+              background: '#ff8800',
+              border: 'none',
+              borderRadius: 6,
+              color: '#fff',
+              padding: '4px 12px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: 12,
+            }}
+          >
+            + Hinzufügen
+          </button>
+          <button
+            onClick={() => setActiveEditorPanel('none')}
+            style={{
+              background: 'rgba(148, 163, 184, 0.35)',
+              border: 'none',
+              borderRadius: 6,
+              color: '#fff',
+              padding: '4px 10px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: 12,
+            }}
+          >
+            Schließen
+          </button>
+        </div>
       </div>
 
       {colliders.length === 0 && (

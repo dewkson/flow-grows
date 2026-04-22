@@ -34,6 +34,11 @@ export function EditableTextPanel({ data, isNearby }: EditableTextPanelProps) {
   const editorMode = useGardenStore((s) => s.editorMode)
   const setIsEditingText = useGardenStore((s) => s.setIsEditingText)
 
+  const panelOffset = data.panelConfig?.offset ?? [8, 0, 10]
+  const panelColor = data.panelConfig?.panelColor ?? PANEL_COLOR
+  const titleColor = data.panelConfig?.titleColor ?? TITLE_COLOR
+  const textColor = data.panelConfig?.textColor ?? TEXT_COLOR
+
   // Notify store when editing state changes
   useEffect(() => {
     setIsEditingText(editing)
@@ -91,13 +96,13 @@ export function EditableTextPanel({ data, isNearby }: EditableTextPanelProps) {
 
   return (
     <Billboard follow lockX={false} lockY={false} lockZ={false}>
-      <group position={[10, PANEL_HEIGHT / 2 + 0.3, 10]}>
+      <group position={[panelOffset[0], PANEL_HEIGHT / 2 + 0.3 + panelOffset[1], panelOffset[2]]}>
         {/* Rounded background panel – XY plane, camera-facing via Billboard */}
         <RoundedPanel
           width={PANEL_WIDTH}
           height={PANEL_HEIGHT}
           radius={PANEL_RADIUS}
-          color={PANEL_COLOR}
+          color={panelColor}
           opacity={PANEL_OPACITY * fade}
         />
 
@@ -107,7 +112,7 @@ export function EditableTextPanel({ data, isNearby }: EditableTextPanelProps) {
           renderOrder={12}
           fontSize={TITLE_SIZE}
           maxWidth={PANEL_WIDTH - 2}
-          color={TITLE_COLOR}
+          color={titleColor}
           fillOpacity={fade}
           anchorX="center"
           anchorY="middle"
@@ -127,7 +132,7 @@ export function EditableTextPanel({ data, isNearby }: EditableTextPanelProps) {
             renderOrder={12}
             fontSize={BODY_SIZE}
             maxWidth={PANEL_WIDTH - 2}
-            color={TEXT_COLOR}
+            color={textColor}
             fillOpacity={fade}
             anchorX="center"
             anchorY="top"

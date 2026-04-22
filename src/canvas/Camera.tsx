@@ -9,6 +9,7 @@ export function CameraController() {
   const isDragging = useRef(false)
   const previousMousePosition = useRef({ x: 0, y: 0 })
   const isEditingTextRef = useRef(false)
+  const cameraDragLockedRef = useRef(false)
 
   const isEmbedOpenRef = useRef(false)
 
@@ -18,6 +19,7 @@ export function CameraController() {
       (state) => {
         isEditingTextRef.current = state.isEditingText
         isEmbedOpenRef.current = state.isEmbedOpen
+        cameraDragLockedRef.current = state.cameraDragLocked
       },
     )
   }, [])
@@ -32,12 +34,18 @@ export function CameraController() {
 
   useEffect(() => {
     const handleMouseDown = (e: MouseEvent) => {
-      if (isEditingTextRef.current || isEmbedOpenRef.current) return
+      const target = e.target as HTMLElement | null
+      if (target?.closest('[data-no-camera-drag="true"]')) return
+      if (cameraDragLockedRef.current || isEditingTextRef.current || isEmbedOpenRef.current) return
       isDragging.current = true
       previousMousePosition.current = { x: e.clientX, y: e.clientY }
     }
 
     const handleMouseMove = (e: MouseEvent) => {
+      if (cameraDragLockedRef.current) {
+        isDragging.current = false
+        return
+      }
       if (!isDragging.current) return
 
       const deltaX = e.clientX - previousMousePosition.current.x

@@ -5,6 +5,9 @@ import { WorldProvider } from './canvas/WorldContext'
 import { ModeToggle } from './ui/ModeToggle'
 import { ColliderPanel } from './ui/ColliderPanel'
 import { EmbedPanel } from './content/EmbedPanel'
+import { ClickZonePanel } from './ui/ClickZonePanel'
+import { EditorMenu } from './ui/EditorMenu'
+import { ContentAreaPanel } from './ui/ContentAreaPanel'
 
 function App() {
   return (
@@ -23,7 +26,10 @@ function App() {
         </WorldProvider>
       </Canvas>
       <ModeToggle />
+      <EditorMenu />
       <ColliderPanel />
+      <ClickZonePanel />
+      <ContentAreaPanel />
       <EmbedPanel />
     </>
   )
