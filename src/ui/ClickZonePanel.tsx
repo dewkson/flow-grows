@@ -49,7 +49,7 @@ export function ClickZonePanel() {
       style={{
         position: 'fixed',
         bottom: 16,
-        right: 16,
+        left: 16,
         zIndex: 1000,
         background: 'rgba(30, 30, 30, 0.92)',
         backdropFilter: 'blur(8px)',

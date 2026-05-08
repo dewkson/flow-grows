@@ -1,5 +1,6 @@
 import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
+import { useGardenStore } from '../store/gardenStore'
 
 
 function GroundSprite({
@@ -53,24 +54,12 @@ function GroundSprite({
 }
 
 export function GardenModels() {
+  const spriteSetup = useGardenStore((s) => s.spriteSetup)
   return (
     <>
-      {/* Bonsai zentral */}
-      {/*<Bonsai position={[0, 0, 0]} /> */}
-
-      {/* Grass zentral + ein Clone versetzt */}
-      {/*<Grass position={[2, 0, 1]} /> */}
-      {/*<Grass position={[-4, 0, -3]} /> */}
-
-      {/* 2D Sprite auf dem Boden */}
-      {/* old
-      <GroundSprite position={[0, 0, 0]} url="/sprites/origin-tree-transparent.png" scale={30} />
-      <GroundSprite position={[0, 0, 0]} url="/sprites/origin-tree-solo.png" scale={30} renderOrder={3} depthTest={false} receiveShadow={false} />
-      <GroundSprite position={[-52, 0, -52]} url="/sprites/music-production-area-transparent.png" scale={20} />
-      <GroundSprite position={[-20, 0, 0]} url="/sprites/path-isles.png" scale={20} />
-      <GroundSprite position={[30, 0, -30]} url="/sprites/game-dev-area.png" scale={30} />
-      */}
-      <GroundSprite position={[0, 0, 0]} url="/sprites/whole.png" scale={50} />
+      {spriteSetup.map((config, i) => (
+        <GroundSprite key={`${config.url}-${i}`} {...config} />
+      ))}
     </>
   )
 }

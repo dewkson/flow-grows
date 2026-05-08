@@ -14,6 +14,34 @@ const EMBED_STORAGE_KEY = 'flow-grows-embeds'
 const CLICK_ZONE_STORAGE_KEY = 'flow-grows-click-zones'
 const LINKED_CLICK_ZONE_STORAGE_KEY = 'flow-grows-linked-click-zones'
 const CONTENT_AREA_META_STORAGE_KEY = 'flow-grows-content-area-meta'
+const GARDENS_STORAGE_KEY = 'flow-grows-gardens'
+const ACTIVE_GARDEN_KEY = 'flow-grows-active-garden'
+const SPRITE_SETUP_KEY = 'flow-grows-sprite-setup'
+
+export type SpriteConfig = {
+  url: string
+  position: [number, number, number]
+  scale?: number
+  stretchFactor?: number
+  renderOrder?: number
+  depthTest?: boolean
+  receiveShadow?: boolean
+}
+
+export type GardenSnapshot = {
+  id: string
+  name: string
+  createdAt: number
+  updatedAt: number
+  spriteSetup: SpriteConfig[]
+  contentAreas: ContentArea[]
+  colliders: Collider[]
+  linkedClickZones: LinkedClickZone[]
+}
+
+export const DEFAULT_SPRITE_SETUP: SpriteConfig[] = [
+  { url: '/sprites/whole.png', position: [0, 0, 0], scale: 50 },
+]
 
 /** Merge saved text overrides into the default content areas */
 function loadContentAreas(): ContentArea[] {
@@ -71,6 +99,48 @@ function loadColliders(): Collider[] {
 
 function saveColliders(colliders: Collider[]) {
   localStorage.setItem(COLLIDER_STORAGE_KEY, JSON.stringify(colliders))
+}
+
+function loadSpriteSetup(): SpriteConfig[] {
+  try {
+    const raw = localStorage.getItem(SPRITE_SETUP_KEY)
+    if (!raw) return DEFAULT_SPRITE_SETUP
+    const parsed = JSON.parse(raw) as SpriteConfig[]
+    return Array.isArray(parsed) ? parsed : DEFAULT_SPRITE_SETUP
+  } catch {
+    return DEFAULT_SPRITE_SETUP
+  }
+}
+
+function saveSpriteSetup(setup: SpriteConfig[]) {
+  localStorage.setItem(SPRITE_SETUP_KEY, JSON.stringify(setup))
+}
+
+function loadGardens(): GardenSnapshot[] {
+  try {
+    const raw = localStorage.getItem(GARDENS_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as GardenSnapshot[]
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function saveGardens(gardens: GardenSnapshot[]) {
+  localStorage.setItem(GARDENS_STORAGE_KEY, JSON.stringify(gardens))
+}
+
+function loadActiveGardenId(): string | null {
+  return localStorage.getItem(ACTIVE_GARDEN_KEY)
+}
+
+function saveActiveGardenId(id: string | null) {
+  if (id === null) {
+    localStorage.removeItem(ACTIVE_GARDEN_KEY)
+  } else {
+    localStorage.setItem(ACTIVE_GARDEN_KEY, id)
+  }
 }
 
 function saveEmbedUrls(areas: ContentArea[]) {
@@ -132,6 +202,9 @@ type GardenStoreState = {
   linkedClickZones: LinkedClickZone[]
   colliders: Collider[]
   selectedColliderId: string | null
+  spriteSetup: SpriteConfig[]
+  gardens: GardenSnapshot[]
+  activeGardenId: string | null
   unlockArea: (id: string) => void
   setActiveContent: (id: string | null) => void
   toggleHintZones: () => void
@@ -154,6 +227,12 @@ type GardenStoreState = {
   removeCollider: (id: string) => void
   updateCollider: (id: string, patch: Partial<Pick<Collider, 'position' | 'size'>>) => void
   selectCollider: (id: string | null) => void
+  setSpriteSetup: (setup: SpriteConfig[]) => void
+  saveCurrentAsGarden: (name: string) => void
+  overwriteCurrentGarden: () => void
+  loadGarden: (id: string) => void
+  deleteGarden: (id: string) => void
+  renameGarden: (id: string, name: string) => void
 }
 
 export const useGardenStore = create<GardenStoreState>((set) => ({
@@ -170,6 +249,9 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
   linkedClickZones: loadLinkedClickZones(),
   colliders: loadColliders(),
   selectedColliderId: null,
+  spriteSetup: loadSpriteSetup(),
+  gardens: loadGardens(),
+  activeGardenId: loadActiveGardenId(),
   unlockArea: (id) =>
     set((state) => ({
       contentAreas: state.contentAreas.map((area) =>
@@ -307,4 +389,103 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
       return { colliders: updated }
     }),
   selectCollider: (id) => set({ selectedColliderId: id }),
+  setSpriteSetup: (setup) => {
+    saveSpriteSetup(setup)
+    set({ spriteSetup: setup })
+  },
+  saveCurrentAsGarden: (name) =>
+    set((state) => {
+      const now = Date.now()
+      const newGarden: GardenSnapshot = {
+        id: `garden-${now}`,
+        name,
+        createdAt: now,
+        updatedAt: now,
+        spriteSetup: state.spriteSetup,
+        contentAreas: state.contentAreas,
+        colliders: state.colliders,
+        linkedClickZones: state.linkedClickZones,
+      }
+      const updated = [...state.gardens, newGarden]
+      saveGardens(updated)
+      saveActiveGardenId(newGarden.id)
+      return { gardens: updated, activeGardenId: newGarden.id }
+    }),
+  overwriteCurrentGarden: () =>
+    set((state) => {
+      if (!state.activeGardenId) return {}
+      const now = Date.now()
+      const updated = state.gardens.map((g) =>
+        g.id === state.activeGardenId
+          ? {
+              ...g,
+              updatedAt: now,
+              spriteSetup: state.spriteSetup,
+              contentAreas: state.contentAreas,
+              colliders: state.colliders,
+              linkedClickZones: state.linkedClickZones,
+            }
+          : g,
+      )
+      saveGardens(updated)
+      return { gardens: updated }
+    }),
+  loadGarden: (id) =>
+    set((state) => {
+      const garden = state.gardens.find((g) => g.id === id)
+      if (!garden) return {}
+
+      // Persist all individual keys so page reloads also use the correct data
+      saveSpriteSetup(garden.spriteSetup)
+      saveColliders(garden.colliders)
+      saveLinkedClickZones(garden.linkedClickZones)
+
+      // Persist content area data
+      const textMap: Record<string, string> = {}
+      const embedMap: Record<string, string[]> = {}
+      const clickZoneMap: Record<string, NonNullable<ContentArea['clickZone']>> = {}
+      const metaMap: Record<string, Partial<ContentArea>> = {}
+      for (const area of garden.contentAreas) {
+        textMap[area.id] = area.description
+        if (area.embedUrls) embedMap[area.id] = area.embedUrls
+        if (area.clickZone) clickZoneMap[area.id] = area.clickZone
+        metaMap[area.id] = {
+          title: area.title,
+          worldPosition: area.worldPosition,
+          interactionRadius: area.interactionRadius,
+          panelConfig: area.panelConfig,
+        }
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(textMap))
+      localStorage.setItem(EMBED_STORAGE_KEY, JSON.stringify(embedMap))
+      localStorage.setItem(CLICK_ZONE_STORAGE_KEY, JSON.stringify(clickZoneMap))
+      localStorage.setItem(CONTENT_AREA_META_STORAGE_KEY, JSON.stringify(metaMap))
+      saveActiveGardenId(id)
+
+      return {
+        spriteSetup: garden.spriteSetup,
+        contentAreas: garden.contentAreas,
+        colliders: garden.colliders,
+        linkedClickZones: garden.linkedClickZones,
+        activeGardenId: id,
+        activeContentId: null,
+        selectedColliderId: null,
+      }
+    }),
+  deleteGarden: (id) =>
+    set((state) => {
+      const updated = state.gardens.filter((g) => g.id !== id)
+      saveGardens(updated)
+      const nextActiveId = state.activeGardenId === id ? null : state.activeGardenId
+      saveActiveGardenId(nextActiveId)
+      return { gardens: updated, activeGardenId: nextActiveId }
+    }),
+  renameGarden: (id, name) =>
+    set((state) => {
+      const updated = state.gardens.map((g) =>
+        g.id === id ? { ...g, name, updatedAt: Date.now() } : g,
+      )
+      saveGardens(updated)
+      return { gardens: updated }
+    }),
 }))

@@ -8,6 +8,7 @@ import { EmbedPanel } from './content/EmbedPanel'
 import { ClickZonePanel } from './ui/ClickZonePanel'
 import { EditorMenu } from './ui/EditorMenu'
 import { ContentAreaPanel } from './ui/ContentAreaPanel'
+import { GardenSwitcher } from './ui/GardenSwitcher'
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
       <ClickZonePanel />
       <ContentAreaPanel />
       <EmbedPanel />
+      <GardenSwitcher />
     </>
   )
 }
