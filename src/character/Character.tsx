@@ -1,4 +1,5 @@
-import { useRef } from 'react'
+import { Billboard, useTexture } from '@react-three/drei'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { characterPosition } from './characterPosition'
@@ -14,8 +15,24 @@ const INITIAL_CAM_Z = 5
 const LERP_SPEED = 0.02
 
 export function Character() {
-  const meshRef = useRef<THREE.Mesh>(null)
+  const meshRef = useRef<THREE.Group>(null)
   const { camera } = useThree()
+  const baseTexture = useTexture('/sprites/me.png')
+
+  const texture = useMemo(() => {
+    const clonedTexture = baseTexture.clone()
+    clonedTexture.colorSpace = THREE.SRGBColorSpace
+    return clonedTexture
+  }, [baseTexture])
+
+  useEffect(() => () => {
+    texture.dispose()
+  }, [texture])
+
+  const textureImage = texture.image as { width: number; height: number } | undefined
+  const textureWidth = textureImage?.width ?? 1
+  const textureHeight = textureImage?.height ?? 1
+  const aspect = textureWidth / textureHeight
 
   useFrame(() => {
     if (!meshRef.current) return
@@ -58,9 +75,21 @@ export function Character() {
   })
 
   return (
-    <mesh ref={meshRef} position={[0, Math.PI / 2, 0]} renderOrder={10000} castShadow>
-      <sphereGeometry args={[1, 32, 32]} />
-      <meshStandardMaterial color="#f88a0c" transparent depthTest={false} depthWrite={false} />
-    </mesh>
+    <group ref={meshRef} position={[0, Math.PI / 2, 0]}>
+      <Billboard follow lockX={false} lockY={false} lockZ={false}>
+        <mesh renderOrder={10000} scale={3}>
+          <planeGeometry args={[aspect * 2, 2]} />
+          <meshBasicMaterial
+            map={texture}
+            transparent
+            alphaTest={0.5}
+            depthTest={false}
+            depthWrite={false}
+            side={THREE.DoubleSide}
+            toneMapped={false}
+          />
+        </mesh>
+      </Billboard>
+    </group>
   )
 }
