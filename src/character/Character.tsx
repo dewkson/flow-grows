@@ -1,5 +1,5 @@
 import { Billboard, useTexture } from '@react-three/drei'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { characterPosition } from './characterPosition'
@@ -14,20 +14,42 @@ const INITIAL_CAM_Z = 5
 /** How fast the character catches up (0 = never, 1 = instant) */
 const LERP_SPEED = 0.02
 
+type FacingDirection = 'front' | 'back' | 'left' | 'right'
+
 export function Character() {
   const meshRef = useRef<THREE.Group>(null)
   const { camera } = useThree()
-  const baseTexture = useTexture('/sprites/me.png')
+  const [facing, setFacing] = useState<FacingDirection>('front')
+  const facingRef = useRef<FacingDirection>('front')
+  const baseTextures = useTexture({
+    front: '/sprites/Character/me front.png',
+    back: '/sprites/Character/me back.png',
+    left: '/sprites/Character/me left.png',
+    right: '/sprites/Character/me right.png',
+  })
 
-  const texture = useMemo(() => {
-    const clonedTexture = baseTexture.clone()
-    clonedTexture.colorSpace = THREE.SRGBColorSpace
-    return clonedTexture
-  }, [baseTexture])
+  const textures = useMemo(() => {
+    const front = baseTextures.front.clone()
+    const back = baseTextures.back.clone()
+    const left = baseTextures.left.clone()
+    const right = baseTextures.right.clone()
+
+    front.colorSpace = THREE.SRGBColorSpace
+    back.colorSpace = THREE.SRGBColorSpace
+    left.colorSpace = THREE.SRGBColorSpace
+    right.colorSpace = THREE.SRGBColorSpace
+
+    return { front, back, left, right }
+  }, [baseTextures.back, baseTextures.front, baseTextures.left, baseTextures.right])
 
   useEffect(() => () => {
-    texture.dispose()
-  }, [texture])
+    textures.front.dispose()
+    textures.back.dispose()
+    textures.left.dispose()
+    textures.right.dispose()
+  }, [textures])
+
+  const texture = textures[facing]
 
   const textureImage = texture.image as { width: number; height: number } | undefined
   const textureWidth = textureImage?.width ?? 1
@@ -45,6 +67,8 @@ export function Character() {
 
     // The camera's ground-center is its XZ position minus the initial offset,
     // clamped so the sphere stays inside the walls (accounting for radius + wall thickness)
+    const currentX = meshRef.current.position.x
+    const currentZ = meshRef.current.position.z
     const targetX = THREE.MathUtils.clamp(
       camera.position.x - INITIAL_CAM_X,
       -CHARACTER_BOUND,
@@ -55,6 +79,9 @@ export function Character() {
       -CHARACTER_BOUND,
       CHARACTER_BOUND,
     )
+
+    const intendedDeltaX = targetX - currentX
+    const intendedDeltaZ = targetZ - currentZ
 
     // Lerp only X and Z – Y (height above ground) stays constant
     meshRef.current.position.x += (targetX - meshRef.current.position.x) * LERP_SPEED
@@ -69,6 +96,24 @@ export function Character() {
     )
     meshRef.current.position.x = resolvedX
     meshRef.current.position.z = resolvedZ
+
+    const movementMagnitude = Math.abs(intendedDeltaX) + Math.abs(intendedDeltaZ)
+
+    if (movementMagnitude > 0.01) {
+      const nextFacing =
+        Math.abs(intendedDeltaX) > Math.abs(intendedDeltaZ)
+          ? intendedDeltaX > 0
+            ? 'right'
+            : 'left'
+          : intendedDeltaZ > 0
+            ? 'front'
+            : 'back'
+
+      if (facingRef.current !== nextFacing) {
+        facingRef.current = nextFacing
+        setFacing(nextFacing)
+      }
+    }
 
     // Expose actual position for other systems
     characterPosition.copy(meshRef.current.position)
