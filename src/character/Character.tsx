@@ -13,8 +13,37 @@ const INITIAL_CAM_Z = 5
 
 /** How fast the character catches up (0 = never, 1 = instant) */
 const LERP_SPEED = 0.02
+const FACING_DEADZONE = 0.01
+const AXIS_SWITCH_HYSTERESIS = 1.2
 
 type FacingDirection = 'front' | 'back' | 'left' | 'right'
+
+function selectFacingFromLerp(
+  deltaX: number,
+  deltaZ: number,
+  currentFacing: FacingDirection,
+): FacingDirection {
+  const absX = Math.abs(deltaX)
+  const absZ = Math.abs(deltaZ)
+
+  // Keep the current facing while almost standing still.
+  if (absX + absZ <= FACING_DEADZONE) return currentFacing
+
+  const isCurrentHorizontal = currentFacing === 'left' || currentFacing === 'right'
+  const isCurrentVertical = currentFacing === 'front' || currentFacing === 'back'
+
+  // Stabilize near diagonals: only switch axis when the new axis is clearly dominant.
+  if (isCurrentHorizontal && absZ > absX * AXIS_SWITCH_HYSTERESIS) {
+    return deltaZ > 0 ? 'front' : 'back'
+  }
+
+  if (isCurrentVertical && absX > absZ * AXIS_SWITCH_HYSTERESIS) {
+    return deltaX > 0 ? 'right' : 'left'
+  }
+
+  if (absX > absZ) return deltaX > 0 ? 'right' : 'left'
+  return deltaZ > 0 ? 'front' : 'back'
+}
 
 export function Character() {
   const meshRef = useRef<THREE.Group>(null)
@@ -97,22 +126,10 @@ export function Character() {
     meshRef.current.position.x = resolvedX
     meshRef.current.position.z = resolvedZ
 
-    const movementMagnitude = Math.abs(intendedDeltaX) + Math.abs(intendedDeltaZ)
-
-    if (movementMagnitude > 0.01) {
-      const nextFacing =
-        Math.abs(intendedDeltaX) > Math.abs(intendedDeltaZ)
-          ? intendedDeltaX > 0
-            ? 'right'
-            : 'left'
-          : intendedDeltaZ > 0
-            ? 'front'
-            : 'back'
-
-      if (facingRef.current !== nextFacing) {
-        facingRef.current = nextFacing
-        setFacing(nextFacing)
-      }
+    const nextFacing = selectFacingFromLerp(intendedDeltaX, intendedDeltaZ, facingRef.current)
+    if (facingRef.current !== nextFacing) {
+      facingRef.current = nextFacing
+      setFacing(nextFacing)
     }
 
     // Expose actual position for other systems
