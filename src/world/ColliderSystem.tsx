@@ -13,6 +13,7 @@ function ColliderBox({ data }: { data: Collider }) {
   const selectedId = useGardenStore((s) => s.selectedColliderId)
   const selectCollider = useGardenStore((s) => s.selectCollider)
   const updateCollider = useGardenStore((s) => s.updateCollider)
+  const setColliderUndoSnapshot = useGardenStore((s) => s.setColliderUndoSnapshot)
   const removeCollider = useGardenStore((s) => s.removeCollider)
   const setCameraDragLocked = useGardenStore((s) => s.setCameraDragLocked)
 
@@ -35,6 +36,7 @@ function ColliderBox({ data }: { data: Collider }) {
         if (!editorMode) return
         e.stopPropagation()
         selectCollider(data.id)
+        setColliderUndoSnapshot(data.id)
         setCameraDragLocked(true)
 
         const hit = new THREE.Vector3()
@@ -50,7 +52,7 @@ function ColliderBox({ data }: { data: Collider }) {
         const target = e.target as (EventTarget & { setPointerCapture?: (id: number) => void }) | null
         target?.setPointerCapture?.(e.pointerId)
       },
-    [editorMode, data.id, data.position, data.size, selectCollider, setCameraDragLocked],
+    [editorMode, data.id, data.position, data.size, selectCollider, setColliderUndoSnapshot, setCameraDragLocked],
   )
 
   const onPointerMove = useCallback(
@@ -65,31 +67,31 @@ function ColliderBox({ data }: { data: Collider }) {
       const { origPos, origSize } = dragStart.current
 
       if (dragging === 'move') {
-        updateCollider(data.id, { position: [origPos[0] + dx, origPos[1] + dz] })
+        updateCollider(data.id, { position: [origPos[0] + dx, origPos[1] + dz] }, { recordUndo: false })
       } else if (dragging === 'x+') {
         const newW = Math.max(MIN_SIZE, origSize[0] + dx)
         updateCollider(data.id, {
           size: [newW, origSize[1]],
           position: [origPos[0] + (newW - origSize[0]) / 2, origPos[1]],
-        })
+        }, { recordUndo: false })
       } else if (dragging === 'x-') {
         const newW = Math.max(MIN_SIZE, origSize[0] - dx)
         updateCollider(data.id, {
           size: [newW, origSize[1]],
           position: [origPos[0] - (newW - origSize[0]) / 2, origPos[1]],
-        })
+        }, { recordUndo: false })
       } else if (dragging === 'z+') {
         const newD = Math.max(MIN_SIZE, origSize[1] + dz)
         updateCollider(data.id, {
           size: [origSize[0], newD],
           position: [origPos[0], origPos[1] + (newD - origSize[1]) / 2],
-        })
+        }, { recordUndo: false })
       } else if (dragging === 'z-') {
         const newD = Math.max(MIN_SIZE, origSize[1] - dz)
         updateCollider(data.id, {
           size: [origSize[0], newD],
           position: [origPos[0], origPos[1] - (newD - origSize[1]) / 2],
-        })
+        }, { recordUndo: false })
       }
     },
     [dragging, data.id, updateCollider],

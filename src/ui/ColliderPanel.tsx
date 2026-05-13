@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useGardenStore } from '../store/gardenStore'
 import { createCollider } from '../data/collider'
 import { characterPosition } from '../character/characterPosition'
@@ -11,7 +12,34 @@ export function ColliderPanel() {
   const addCollider = useGardenStore((s) => s.addCollider)
   const removeCollider = useGardenStore((s) => s.removeCollider)
   const updateCollider = useGardenStore((s) => s.updateCollider)
+  const setColliderUndoSnapshot = useGardenStore((s) => s.setColliderUndoSnapshot)
+  const undoLastColliderChange = useGardenStore((s) => s.undoLastColliderChange)
+  const canUndoColliderChange = useGardenStore((s) => s.canUndoColliderChange)
   const selectCollider = useGardenStore((s) => s.selectCollider)
+
+  useEffect(() => {
+    if (!editorMode || activeEditorPanel !== 'colliders') return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z') return
+
+      const target = event.target as HTMLElement | null
+      const tagName = target?.tagName
+      const isTypingTarget =
+        target?.isContentEditable ||
+        tagName === 'INPUT' ||
+        tagName === 'TEXTAREA' ||
+        tagName === 'SELECT'
+      if (isTypingTarget) return
+      if (!useGardenStore.getState().canUndoColliderChange) return
+
+      event.preventDefault()
+      useGardenStore.getState().undoLastColliderChange()
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [editorMode, activeEditorPanel])
 
   if (!editorMode || activeEditorPanel !== 'colliders') return null
 
@@ -63,6 +91,23 @@ export function ColliderPanel() {
             }}
           >
             + Hinzufügen
+          </button>
+          <button
+            onClick={undoLastColliderChange}
+            disabled={!canUndoColliderChange}
+            title="Rückgängig (Ctrl/Cmd+Z)"
+            style={{
+              background: canUndoColliderChange ? 'rgba(59, 130, 246, 0.85)' : 'rgba(59, 130, 246, 0.3)',
+              border: 'none',
+              borderRadius: 6,
+              color: '#fff',
+              padding: '4px 10px',
+              cursor: canUndoColliderChange ? 'pointer' : 'not-allowed',
+              fontWeight: 600,
+              fontSize: 12,
+            }}
+          >
+            Rueckgaengig
           </button>
           <button
             onClick={() => setActiveEditorPanel('none')}
@@ -136,8 +181,13 @@ export function ColliderPanel() {
                 type="number"
                 step={0.5}
                 value={selected.position[0]}
+                onFocus={() => setColliderUndoSnapshot(selected.id)}
                 onChange={(e) =>
-                  updateCollider(selected.id, { position: [parseFloat(e.target.value) || 0, selected.position[1]] })
+                  updateCollider(
+                    selected.id,
+                    { position: [parseFloat(e.target.value) || 0, selected.position[1]] },
+                    { recordUndo: false },
+                  )
                 }
                 style={inputStyle}
               />
@@ -148,8 +198,13 @@ export function ColliderPanel() {
                 type="number"
                 step={0.5}
                 value={selected.position[1]}
+                onFocus={() => setColliderUndoSnapshot(selected.id)}
                 onChange={(e) =>
-                  updateCollider(selected.id, { position: [selected.position[0], parseFloat(e.target.value) || 0] })
+                  updateCollider(
+                    selected.id,
+                    { position: [selected.position[0], parseFloat(e.target.value) || 0] },
+                    { recordUndo: false },
+                  )
                 }
                 style={inputStyle}
               />
@@ -161,8 +216,13 @@ export function ColliderPanel() {
                 step={0.5}
                 min={1}
                 value={selected.size[0]}
+                onFocus={() => setColliderUndoSnapshot(selected.id)}
                 onChange={(e) =>
-                  updateCollider(selected.id, { size: [Math.max(1, parseFloat(e.target.value) || 1), selected.size[1]] })
+                  updateCollider(
+                    selected.id,
+                    { size: [Math.max(1, parseFloat(e.target.value) || 1), selected.size[1]] },
+                    { recordUndo: false },
+                  )
                 }
                 style={inputStyle}
               />
@@ -174,8 +234,13 @@ export function ColliderPanel() {
                 step={0.5}
                 min={1}
                 value={selected.size[1]}
+                onFocus={() => setColliderUndoSnapshot(selected.id)}
                 onChange={(e) =>
-                  updateCollider(selected.id, { size: [selected.size[0], Math.max(1, parseFloat(e.target.value) || 1)] })
+                  updateCollider(
+                    selected.id,
+                    { size: [selected.size[0], Math.max(1, parseFloat(e.target.value) || 1)] },
+                    { recordUndo: false },
+                  )
                 }
                 style={inputStyle}
               />

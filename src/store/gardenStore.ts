@@ -39,6 +39,16 @@ export type GardenSnapshot = {
   linkedClickZones: LinkedClickZone[]
 }
 
+type ColliderUndoSnapshot = {
+  id: string
+  position: [number, number]
+  size: [number, number]
+}
+
+type UpdateColliderOptions = {
+  recordUndo?: boolean
+}
+
 export const DEFAULT_SPRITE_SETUP: SpriteConfig[] = [
   { url: '/sprites/whole.png', position: [0, 0, 0], scale: 50 },
 ]
@@ -202,6 +212,8 @@ type GardenStoreState = {
   linkedClickZones: LinkedClickZone[]
   colliders: Collider[]
   selectedColliderId: string | null
+  lastColliderUndo: ColliderUndoSnapshot | null
+  canUndoColliderChange: boolean
   spriteSetup: SpriteConfig[]
   gardens: GardenSnapshot[]
   activeGardenId: string | null
@@ -225,7 +237,13 @@ type GardenStoreState = {
   removeLinkedClickZone: (id: string) => void
   addCollider: (collider: Collider) => void
   removeCollider: (id: string) => void
-  updateCollider: (id: string, patch: Partial<Pick<Collider, 'position' | 'size'>>) => void
+  setColliderUndoSnapshot: (id: string) => void
+  undoLastColliderChange: () => void
+  updateCollider: (
+    id: string,
+    patch: Partial<Pick<Collider, 'position' | 'size'>>,
+    options?: UpdateColliderOptions,
+  ) => void
   selectCollider: (id: string | null) => void
   setSpriteSetup: (setup: SpriteConfig[]) => void
   saveCurrentAsGarden: (name: string) => void
@@ -249,6 +267,8 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
   linkedClickZones: loadLinkedClickZones(),
   colliders: loadColliders(),
   selectedColliderId: null,
+  lastColliderUndo: null,
+  canUndoColliderChange: false,
   spriteSetup: loadSpriteSetup(),
   gardens: loadGardens(),
   activeGardenId: loadActiveGardenId(),
@@ -369,24 +389,82 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
     set((state) => {
       const updated = [...state.colliders, collider]
       saveColliders(updated)
-      return { colliders: updated }
+      return { colliders: updated, lastColliderUndo: null, canUndoColliderChange: false }
     }),
   removeCollider: (id) =>
     set((state) => {
       const updated = state.colliders.filter((c) => c.id !== id)
+      const shouldResetUndo = state.lastColliderUndo?.id === id
       saveColliders(updated)
       return {
         colliders: updated,
         selectedColliderId: state.selectedColliderId === id ? null : state.selectedColliderId,
+        lastColliderUndo: shouldResetUndo ? null : state.lastColliderUndo,
+        canUndoColliderChange: shouldResetUndo ? false : state.canUndoColliderChange,
       }
     }),
-  updateCollider: (id, patch) =>
+  setColliderUndoSnapshot: (id) =>
     set((state) => {
+      const collider = state.colliders.find((c) => c.id === id)
+      if (!collider) return {}
+      return {
+        lastColliderUndo: {
+          id: collider.id,
+          position: [...collider.position] as [number, number],
+          size: [...collider.size] as [number, number],
+        },
+        canUndoColliderChange: true,
+      }
+    }),
+  undoLastColliderChange: () =>
+    set((state) => {
+      const snapshot = state.lastColliderUndo
+      if (!snapshot) return {}
+
+      const idx = state.colliders.findIndex((c) => c.id === snapshot.id)
+      if (idx < 0) {
+        return { lastColliderUndo: null, canUndoColliderChange: false }
+      }
+
+      const updated = [...state.colliders]
+      updated[idx] = {
+        ...updated[idx],
+        position: [...snapshot.position],
+        size: [...snapshot.size],
+      }
+      saveColliders(updated)
+
+      return {
+        colliders: updated,
+        selectedColliderId: snapshot.id,
+        lastColliderUndo: null,
+        canUndoColliderChange: false,
+      }
+    }),
+  updateCollider: (id, patch, options) =>
+    set((state) => {
+      const current = state.colliders.find((c) => c.id === id)
+      if (!current) return {}
+
       const updated = state.colliders.map((c) =>
         c.id === id ? { ...c, ...patch } : c,
       )
       saveColliders(updated)
-      return { colliders: updated }
+
+      const shouldRecordUndo = options?.recordUndo ?? true
+      if (!shouldRecordUndo) {
+        return { colliders: updated }
+      }
+
+      return {
+        colliders: updated,
+        lastColliderUndo: {
+          id: current.id,
+          position: [...current.position] as [number, number],
+          size: [...current.size] as [number, number],
+        },
+        canUndoColliderChange: true,
+      }
     }),
   selectCollider: (id) => set({ selectedColliderId: id }),
   setSpriteSetup: (setup) => {
@@ -470,6 +548,8 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
         activeGardenId: id,
         activeContentId: null,
         selectedColliderId: null,
+        lastColliderUndo: null,
+        canUndoColliderChange: false,
       }
     }),
   deleteGarden: (id) =>
