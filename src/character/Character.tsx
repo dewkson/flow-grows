@@ -58,9 +58,9 @@ export function Character() {
   })
 
   return (
-    <mesh ref={meshRef} position={[0, Math.PI / 2, 0]} renderOrder={2} castShadow>
+    <mesh ref={meshRef} position={[0, Math.PI / 2, 0]} renderOrder={10000} castShadow>
       <sphereGeometry args={[1, 32, 32]} />
-      <meshStandardMaterial color="#f88a0c" />
+      <meshStandardMaterial color="#f88a0c" transparent depthTest={false} depthWrite={false} />
     </mesh>
   )
 }

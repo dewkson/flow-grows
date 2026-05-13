@@ -1,4 +1,5 @@
-import { useTexture } from '@react-three/drei'
+import { Billboard, useTexture } from '@react-three/drei'
+import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { useGardenStore } from '../store/gardenStore'
 
@@ -6,50 +7,48 @@ import { useGardenStore } from '../store/gardenStore'
 function GroundSprite({
   position,
   url,
-  scale = 3,
-  stretchFactor = 2, // Anpassen je nach Kamerawinkel
-  renderOrder = 1,
-  depthTest = true,
+  renderOrder = 9999,
+  depthTest = false,
   receiveShadow = true,
 }: {
   position: [number, number, number]
   url: string
-  scale?: number
-  stretchFactor?: number
   renderOrder?: number
   depthTest?: boolean
   receiveShadow?: boolean
 }) {
-  const texture = useTexture(url)
+  const baseTexture = useTexture(url)
 
-  // Schärfere Darstellung: kein Mipmap-Blur, anisotropes Filtering für schräge Ansicht
-  texture.minFilter = THREE.LinearFilter
-  texture.magFilter = THREE.LinearFilter
-  texture.generateMipmaps = false
-  texture.anisotropy = 16
-  texture.colorSpace = THREE.SRGBColorSpace
+  const texture = useMemo(() => {
+    const clonedTexture = baseTexture.clone()
+    clonedTexture.colorSpace = THREE.SRGBColorSpace
+    return clonedTexture
+  }, [baseTexture])
+
+  useEffect(() => () => {
+    texture.dispose()
+  }, [texture])
+
+  const textureImage = texture.image as { width: number; height: number } | undefined
+  const textureWidth = textureImage?.width ?? 1
+  const textureHeight = textureImage?.height ?? 1
+  const aspect = textureWidth / textureHeight
 
   return (
-    <mesh
-      position={[position[0], 0.01, position[2]]}
-      rotation={[-Math.PI / 2, 0, Math.PI / 4]} // Rotation um Z entfernt!
-      renderOrder={renderOrder}
-      receiveShadow={receiveShadow}
-    >
-      {/* Breite bleibt gleich, Höhe wird gestreckt */}
-      <planeGeometry args={[scale, scale * stretchFactor]} />
-      <meshStandardMaterial
-        map={texture}
-        transparent={true}
-        alphaTest={0.5}
-        depthWrite={false}
-        depthTest={depthTest}
-        side={THREE.DoubleSide}
-        polygonOffset
-        polygonOffsetFactor={-1}
-        toneMapped={false}
-      />
-    </mesh>
+    <Billboard follow lockX={false} lockY={false} lockZ={false} position={position} renderOrder={renderOrder}>
+      <mesh renderOrder={renderOrder} receiveShadow={receiveShadow} scale={40}>
+        <planeGeometry args={[aspect, 1]} />
+        <meshBasicMaterial
+          map={texture}
+          transparent={true}
+          alphaTest={0.5}
+          depthWrite={false}
+          depthTest={depthTest}
+          side={THREE.DoubleSide}
+          toneMapped={false}
+        />
+      </mesh>
+    </Billboard>
   )
 }
 
