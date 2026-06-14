@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { HALF_GROUND, WALL_THICKNESS } from '../world/constants'
+import { CAM_OFFSET, HALF_GROUND, WALL_THICKNESS } from '../world/constants'
 import { useGardenStore } from '../store/gardenStore'
 
 export function CameraController() {
@@ -87,7 +87,6 @@ export function CameraController() {
 
   // Elastic lerp-back: if the camera's ground-projected center is outside
   // the allowed area, smoothly pull it back inside.
-  const CAM_OFFSET = 5
   const CAMERA_BOUND = HALF_GROUND - WALL_THICKNESS / 2
   const RETURN_SPEED = 0.12
 

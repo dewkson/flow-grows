@@ -1,8 +1,6 @@
-import { useState } from 'react'
-import { useFrame } from '@react-three/fiber'
 import type { ContentArea } from '../data/contentArea'
-import { characterPosition } from '../character/characterPosition'
 import { useGardenStore } from '../store/gardenStore'
+import { useProximity } from '../character/useProximity'
 import { TextContent } from './TextContent'
 import { EditableTextPanel } from './EditableTextPanel'
 import { ContentZone } from './ContentZone'
@@ -12,20 +10,9 @@ type InteractableContentProps = {
 }
 
 export function InteractableContent({ data }: InteractableContentProps) {
-  const [isNearby, setIsNearby] = useState(false)
-
   const showHintZones = useGardenStore((s) => s.showHintZones)
-
   const radius = data.interactionRadius ?? 2.5
-
-  // Per-frame proximity check using the shared mutable characterPosition
-  useFrame(() => {
-    const dx = characterPosition.x - data.worldPosition[0]
-    const dz = characterPosition.z - data.worldPosition[2]
-    const dist = Math.sqrt(dx * dx + dz * dz)
-    const nearby = dist < radius
-    if (nearby !== isNearby) setIsNearby(nearby)
-  })
+  const isNearby = useProximity(data.worldPosition, radius)
 
   return (
     <group position={data.worldPosition}>

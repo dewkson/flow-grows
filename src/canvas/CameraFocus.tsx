@@ -2,10 +2,10 @@ import { useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGardenStore } from '../store/gardenStore'
+import { CAM_OFFSET } from '../world/constants'
 
 const FOCUS_LERP_SPEED = 0.04
 const FOCUS_Y_OFFSET = 3
-const CAM_OFFSET = 5
 
 export function CameraFocus() {
   const { camera } = useThree()

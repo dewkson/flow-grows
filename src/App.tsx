@@ -1,7 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Scene } from './canvas/Scene'
-import { WorldProvider } from './canvas/WorldContext'
 import { ModeToggle } from './ui/ModeToggle'
 import { ColliderPanel } from './ui/ColliderPanel'
 import { EmbedPanel } from './content/EmbedPanel'
@@ -22,9 +21,7 @@ function App() {
         scene={{ background: new THREE.Color('#1a1a2e') }}
         style={{ width: '100vw', height: '100vh', display: 'block' }}
       >
-        <WorldProvider>
-          <Scene />
-        </WorldProvider>
+        <Scene />
       </Canvas>
       <ModeToggle />
       <EditorMenu />

@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import { type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGardenStore } from '../store/gardenStore'
@@ -110,10 +110,19 @@ function ColliderBox({ data }: { data: Collider }) {
     [dragging, setCameraDragLocked],
   )
 
-  if (!visible) return null
-
   const [w, d] = data.size
   const h = 2 // visual height
+
+  const edgesGeo = useMemo(() => {
+    const box = new THREE.BoxGeometry(w, h, d)
+    const edges = new THREE.EdgesGeometry(box)
+    box.dispose()
+    return edges
+  }, [w, d])
+
+  useEffect(() => () => edgesGeo.dispose(), [edgesGeo])
+
+  if (!visible) return null
 
   return (
     <group position={[data.position[0], h / 2, data.position[1]]}>
@@ -138,8 +147,7 @@ function ColliderBox({ data }: { data: Collider }) {
       </mesh>
 
       {/* Wireframe overlay */}
-      <lineSegments>
-        <edgesGeometry args={[new THREE.BoxGeometry(w, h, d)]} />
+      <lineSegments geometry={edgesGeo}>
         <lineBasicMaterial color={isSelected ? '#ff2222' : '#ff6600'} />
       </lineSegments>
 

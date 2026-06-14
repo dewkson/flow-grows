@@ -15,3 +15,6 @@ export const CHARACTER_RADIUS = 1
 
 /** Max distance the character center can be from origin */
 export const CHARACTER_BOUND = HALF_GROUND - CHARACTER_RADIUS
+
+/** Isometric camera offset from world-center to camera position */
+export const CAM_OFFSET = 5

@@ -31,8 +31,8 @@ export function Lights() {
         position={[5, 10, 5]}
         intensity={1}
         castShadow
-        shadow-mapSize-width={4096}
-        shadow-mapSize-height={4096}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
         shadow-camera-left={-50}
         shadow-camera-right={50}
         shadow-camera-top={50}

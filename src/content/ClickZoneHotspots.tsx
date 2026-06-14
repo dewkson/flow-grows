@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { Html } from '@react-three/drei'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { ClickZone, ContentArea, LinkedClickZone } from '../data/contentArea'
-import { characterPosition } from '../character/characterPosition'
+import { useProximity } from '../character/useProximity'
 import { useGardenStore } from '../store/gardenStore'
+
+const DEBUG_IDLE = new THREE.Color('#0ea5e9')
+const DEBUG_ACTIVE = new THREE.Color('#38bdf8')
 
 type ClickZoneHotspotProps = {
   zone: LinkedClickZone
@@ -19,16 +22,8 @@ export function ClickZoneHotspot({ zone, linkedArea }: ClickZoneHotspotProps) {
   const updateLinkedClickZoneShape = useGardenStore((s) => s.updateLinkedClickZoneShape)
   const setCameraDragLocked = useGardenStore((s) => s.setCameraDragLocked)
 
-  const [isNearby, setIsNearby] = useState(false)
   const radius = linkedArea.interactionRadius ?? 2.5
-
-  useFrame(() => {
-    const dx = characterPosition.x - linkedArea.worldPosition[0]
-    const dz = characterPosition.z - linkedArea.worldPosition[2]
-    const dist = Math.sqrt(dx * dx + dz * dz)
-    const nearby = dist < radius
-    if (nearby !== isNearby) setIsNearby(nearby)
-  })
+  const isNearby = useProximity(linkedArea.worldPosition, radius)
 
   const handleClick = useCallback(() => {
     if (editorMode) return
@@ -92,8 +87,6 @@ function EditableHotspotShape({
   const isDraggingWorldRef = useRef(false)
   const isDraggingScreenRef = useRef(false)
   const screenDragStartRef = useRef<{ mouseX: number; mouseY: number; baseX: number; baseY: number } | null>(null)
-  const DEBUG_IDLE = new THREE.Color('#0ea5e9')
-  const DEBUG_ACTIVE = new THREE.Color('#38bdf8')
 
   const space = clickZone.space ?? 'world'
   const position = useMemo<[number, number, number]>(

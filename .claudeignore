@@ -1,0 +1,71 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build / output
+dist/
+build/
+out/
+.next/
+.nuxt/
+.output/
+.vite/
+
+# Lockfiles
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+
+# Environment / secrets
+.env
+.env.*
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# Binary 3D assets
+public/models/*.fbx
+public/models/*.glb
+public/models/*.gltf
+public/models/*.blend
+public/models/*.obj
+public/models/*.dae
+
+# Large textures (>1 MB threshold — keep small UI sprites readable)
+public/models/textures/
+public/sprites/Character/me.png
+public/sprites/Character/spritesheet.png
+public/sprites/music-production-area*.png
+public/sprites/game-dev-area.png
+public/sprites/game-dev-area-nontransparent.png
+public/sprites/gamedev.png
+public/sprites/kitchen.png
+public/sprites/music.png
+public/sprites/origin-tree.png
+public/sprites/origin-tree-transparent*.png
+public/sprites/path-*.png
+public/sprites/whole*.png
+
+# Audio / video
+*.mp3
+*.wav
+*.ogg
+*.mp4
+*.webm
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Test / coverage output
+coverage/
+.nyc_output/
