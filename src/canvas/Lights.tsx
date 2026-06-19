@@ -25,7 +25,8 @@ export function Lights() {
 
   return (
     <>
-      <ambientLight intensity={0.5} />
+      <ambientLight intensity={0.4} />
+      <hemisphereLight args={['#87ceeb', '#4a7a35', 0.6]} />
       <directionalLight
         ref={lightRef}
         position={[5, 10, 5]}

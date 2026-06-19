@@ -10,7 +10,7 @@ import { ColliderSystem } from '../world/ColliderSystem'
 export function Scene() {
   return (
     <>
-      <color attach="background" args={['#9e9e9e']} />
+      <color attach="background" args={['#a8d4f0']} />
       <CameraController />
       <CameraFocus />
       <Lights />
