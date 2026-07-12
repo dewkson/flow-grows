@@ -1,5 +1,5 @@
-import { Billboard, useTexture } from '@react-three/drei'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useGLTF, useAnimations } from '@react-three/drei'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { characterPosition } from './characterPosition'
@@ -15,8 +15,26 @@ const INITIAL_CAM_Z = 5
 const LERP_SPEED = 0.02
 const FACING_DEADZONE = 0.01
 const AXIS_SWITCH_HYSTERESIS = 1.2
+const ROTATION_LERP = 0.12
+const WALK_THRESHOLD = 0.02
 
 type FacingDirection = 'front' | 'back' | 'left' | 'right'
+
+// Avaturn.me avatar faces -Z by default.
+// Map each game-direction to the Y-rotation that aligns the model with movement.
+const FACING_ROTATION: Record<FacingDirection, number> = {
+  back:  0,              // moving -Z → keep default -Z facing
+  front: Math.PI,        // moving +Z → flip 180°
+  left:  Math.PI / 2,    // moving -X → rotate 90°
+  right: -Math.PI / 2,   // moving +X → rotate -90°
+}
+
+/** Shortest-path angle lerp (handles ±PI wrap-around). */
+function lerpAngle(current: number, target: number, t: number): number {
+  let delta = target - current
+  delta = ((delta % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI
+  return current + delta * t
+}
 
 function selectFacingFromLerp(
   deltaX: number,
@@ -26,13 +44,11 @@ function selectFacingFromLerp(
   const absX = Math.abs(deltaX)
   const absZ = Math.abs(deltaZ)
 
-  // Keep the current facing while almost standing still.
   if (absX + absZ <= FACING_DEADZONE) return currentFacing
 
   const isCurrentHorizontal = currentFacing === 'left' || currentFacing === 'right'
   const isCurrentVertical = currentFacing === 'front' || currentFacing === 'back'
 
-  // Stabilize near diagonals: only switch axis when the new axis is clearly dominant.
   if (isCurrentHorizontal && absZ > absX * AXIS_SWITCH_HYSTERESIS) {
     return deltaZ > 0 ? 'front' : 'back'
   }
@@ -45,59 +61,46 @@ function selectFacingFromLerp(
   return deltaZ > 0 ? 'front' : 'back'
 }
 
+useGLTF.preload('/models/Character/character.glb')
+
 export function Character() {
-  const meshRef = useRef<THREE.Group>(null)
+  const groupRef = useRef<THREE.Group>(null)
   const { camera } = useThree()
-  const [facing, setFacing] = useState<FacingDirection>('front')
   const facingRef = useRef<FacingDirection>('front')
-  const baseTextures = useTexture({
-    front: '/sprites/Character/me front.png',
-    back: '/sprites/Character/me back.png',
-    left: '/sprites/Character/me left.png',
-    right: '/sprites/Character/me right.png',
-  })
+  const targetRotationRef = useRef(FACING_ROTATION.front)
+  const isMovingRef = useRef(false)
 
-  const textures = useMemo(() => {
-    const front = baseTextures.front.clone()
-    const back = baseTextures.back.clone()
-    const left = baseTextures.left.clone()
-    const right = baseTextures.right.clone()
+  const { scene, animations } = useGLTF('/models/Character/character.glb')
+  // Bind the mixer directly to the scene so bone track names resolve correctly
+  const { actions, names } = useAnimations(animations, scene)
 
-    front.colorSpace = THREE.SRGBColorSpace
-    back.colorSpace = THREE.SRGBColorSpace
-    left.colorSpace = THREE.SRGBColorSpace
-    right.colorSpace = THREE.SRGBColorSpace
+  const idleAnim = useMemo(() => names.find(n => /idle/i.test(n)) ?? names[0], [names])
+  const walkAnim = useMemo(() => names.find(n => /walk/i.test(n)), [names])
 
-    return { front, back, left, right }
-  }, [baseTextures.back, baseTextures.front, baseTextures.left, baseTextures.right])
+  // Enable shadows on all meshes in the model
+  useEffect(() => {
+    scene.traverse(obj => {
+      if ((obj as THREE.Mesh).isMesh) obj.castShadow = true
+    })
+  }, [scene])
 
-  useEffect(() => () => {
-    textures.front.dispose()
-    textures.back.dispose()
-    textures.left.dispose()
-    textures.right.dispose()
-  }, [textures])
-
-  const texture = textures[facing]
-
-  const textureImage = texture.image as { width: number; height: number } | undefined
-  const textureWidth = textureImage?.width ?? 1
-  const textureHeight = textureImage?.height ?? 1
-  const aspect = textureWidth / textureHeight
+  // Start idle animation – depend on names so this fires once animations are ready
+  useEffect(() => {
+    if (!idleAnim) return
+    actions[idleAnim]?.reset().play()
+  }, [actions, idleAnim, names])
 
   useFrame(() => {
-    if (!meshRef.current) return
+    if (!groupRef.current) return
 
     // Freeze movement when embed panel is open
     if (useGardenStore.getState().isEmbedOpen) {
-      characterPosition.copy(meshRef.current.position)
+      characterPosition.copy(groupRef.current.position)
       return
     }
 
-    // The camera's ground-center is its XZ position minus the initial offset,
-    // clamped so the sphere stays inside the walls (accounting for radius + wall thickness)
-    const currentX = meshRef.current.position.x
-    const currentZ = meshRef.current.position.z
+    const currentX = groupRef.current.position.x
+    const currentZ = groupRef.current.position.z
     const targetX = THREE.MathUtils.clamp(
       camera.position.x - INITIAL_CAM_X,
       -CHARACTER_BOUND,
@@ -113,45 +116,55 @@ export function Character() {
     const intendedDeltaZ = targetZ - currentZ
 
     // Lerp only X and Z – Y (height above ground) stays constant
-    meshRef.current.position.x += (targetX - meshRef.current.position.x) * LERP_SPEED
-    meshRef.current.position.z += (targetZ - meshRef.current.position.z) * LERP_SPEED
+    groupRef.current.position.x += (targetX - groupRef.current.position.x) * LERP_SPEED
+    groupRef.current.position.z += (targetZ - groupRef.current.position.z) * LERP_SPEED
 
     // Resolve collisions with placed colliders
     const colliders = useGardenStore.getState().colliders
     const [resolvedX, resolvedZ] = resolveCollisions(
-      meshRef.current.position.x,
-      meshRef.current.position.z,
+      groupRef.current.position.x,
+      groupRef.current.position.z,
       colliders,
     )
-    meshRef.current.position.x = resolvedX
-    meshRef.current.position.z = resolvedZ
+    groupRef.current.position.x = resolvedX
+    groupRef.current.position.z = resolvedZ
 
+    // Update facing & smoothly rotate model toward movement direction
     const nextFacing = selectFacingFromLerp(intendedDeltaX, intendedDeltaZ, facingRef.current)
     if (facingRef.current !== nextFacing) {
       facingRef.current = nextFacing
-      setFacing(nextFacing)
+      targetRotationRef.current = FACING_ROTATION[nextFacing]
+    }
+    groupRef.current.rotation.y = lerpAngle(
+      groupRef.current.rotation.y,
+      targetRotationRef.current,
+      ROTATION_LERP,
+    )
+
+    // Switch idle ↔ walk animations based on movement.
+    // Only modify animations when walkAnim exists – otherwise idle runs
+    // uninterrupted and reset() never causes a T-pose flash.
+    const isMoving = Math.abs(intendedDeltaX) + Math.abs(intendedDeltaZ) > WALK_THRESHOLD
+    if (isMoving !== isMovingRef.current) {
+      isMovingRef.current = isMoving
+      if (walkAnim) {
+        if (isMoving) {
+          actions[idleAnim]?.fadeOut(0.2)
+          actions[walkAnim]?.reset().fadeIn(0.2).play()
+        } else {
+          actions[walkAnim]?.fadeOut(0.2)
+          if (idleAnim) actions[idleAnim]?.reset().fadeIn(0.2).play()
+        }
+      }
     }
 
     // Expose actual position for other systems
-    characterPosition.copy(meshRef.current.position)
+    characterPosition.copy(groupRef.current.position)
   })
 
   return (
-    <group ref={meshRef} position={[0, Math.PI / 2, 0]}>
-      <Billboard follow lockX={false} lockY={false} lockZ={false}>
-        <mesh renderOrder={10000} scale={3}>
-          <planeGeometry args={[aspect * 2, 2]} />
-          <meshBasicMaterial
-            map={texture}
-            transparent
-            alphaTest={0.5}
-            depthTest={false}
-            depthWrite={false}
-            side={THREE.DoubleSide}
-            toneMapped={false}
-          />
-        </mesh>
-      </Billboard>
+    <group ref={groupRef} scale={2}>
+      <primitive object={scene} />
     </group>
   )
 }
