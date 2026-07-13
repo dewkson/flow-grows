@@ -17,6 +17,9 @@ const CONTENT_AREA_META_STORAGE_KEY = 'flow-grows-content-area-meta'
 const GARDENS_STORAGE_KEY = 'flow-grows-gardens'
 const ACTIVE_GARDEN_KEY = 'flow-grows-active-garden'
 const SPRITE_SETUP_KEY = 'flow-grows-sprite-setup'
+const MOTION_THRESHOLDS_KEY = 'flow-grows-motion-thresholds'
+const CHARACTER_LERP_SPEED_KEY = 'flow-grows-character-lerp-speed'
+const CHARACTER_MAX_SPEED_KEY = 'flow-grows-character-max-speed'
 
 export type SpriteConfig = {
   url: string
@@ -49,9 +52,30 @@ type UpdateColliderOptions = {
   recordUndo?: boolean
 }
 
+/** Speed thresholds (world units/sec) driving the character's idle/walk/run animation state, with hysteresis. */
+export type MotionThresholds = {
+  walkEnter: number
+  walkExit: number
+  runEnter: number
+  runExit: number
+}
+
 export const DEFAULT_SPRITE_SETUP: SpriteConfig[] = [
   { url: '/sprites/whole.png', position: [0, 0, 0], scale: 50 },
 ]
+
+export const DEFAULT_MOTION_THRESHOLDS: MotionThresholds = {
+  walkEnter: 0.5,
+  walkExit: 0.3,
+  runEnter: 6,
+  runExit: 4,
+}
+
+/** How fast the character catches up to its target position each frame (0 = never, 1 = instant). */
+export const DEFAULT_CHARACTER_LERP_SPEED = 0.1
+
+/** Hard cap on movement speed (world units/sec), independent of the lerp factor. */
+export const DEFAULT_CHARACTER_MAX_SPEED = 12
 
 /** Merge saved text overrides into the default content areas */
 function loadContentAreas(): ContentArea[] {
@@ -141,6 +165,51 @@ function saveGardens(gardens: GardenSnapshot[]) {
   localStorage.setItem(GARDENS_STORAGE_KEY, JSON.stringify(gardens))
 }
 
+function loadMotionThresholds(): MotionThresholds {
+  try {
+    const raw = localStorage.getItem(MOTION_THRESHOLDS_KEY)
+    if (!raw) return DEFAULT_MOTION_THRESHOLDS
+    const parsed = JSON.parse(raw) as Partial<MotionThresholds>
+    return { ...DEFAULT_MOTION_THRESHOLDS, ...parsed }
+  } catch {
+    return DEFAULT_MOTION_THRESHOLDS
+  }
+}
+
+function saveMotionThresholds(thresholds: MotionThresholds) {
+  localStorage.setItem(MOTION_THRESHOLDS_KEY, JSON.stringify(thresholds))
+}
+
+function loadCharacterLerpSpeed(): number {
+  try {
+    const raw = localStorage.getItem(CHARACTER_LERP_SPEED_KEY)
+    if (!raw) return DEFAULT_CHARACTER_LERP_SPEED
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) ? parsed : DEFAULT_CHARACTER_LERP_SPEED
+  } catch {
+    return DEFAULT_CHARACTER_LERP_SPEED
+  }
+}
+
+function saveCharacterLerpSpeed(speed: number) {
+  localStorage.setItem(CHARACTER_LERP_SPEED_KEY, String(speed))
+}
+
+function loadCharacterMaxSpeed(): number {
+  try {
+    const raw = localStorage.getItem(CHARACTER_MAX_SPEED_KEY)
+    if (!raw) return DEFAULT_CHARACTER_MAX_SPEED
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) ? parsed : DEFAULT_CHARACTER_MAX_SPEED
+  } catch {
+    return DEFAULT_CHARACTER_MAX_SPEED
+  }
+}
+
+function saveCharacterMaxSpeed(speed: number) {
+  localStorage.setItem(CHARACTER_MAX_SPEED_KEY, String(speed))
+}
+
 function loadActiveGardenId(): string | null {
   return localStorage.getItem(ACTIVE_GARDEN_KEY)
 }
@@ -204,7 +273,7 @@ type GardenStoreState = {
   showHintZones: boolean
   showHotspotZones: boolean
   cameraDragLocked: boolean
-  activeEditorPanel: 'none' | 'colliders' | 'clickzones' | 'hints'
+  activeEditorPanel: 'none' | 'colliders' | 'clickzones' | 'hints' | 'motion'
   editorMode: boolean
   isEditingText: boolean
   isEmbedOpen: boolean
@@ -217,12 +286,18 @@ type GardenStoreState = {
   spriteSetup: SpriteConfig[]
   gardens: GardenSnapshot[]
   activeGardenId: string | null
+  motionThresholds: MotionThresholds
+  setMotionThresholds: (patch: Partial<MotionThresholds>) => void
+  characterLerpSpeed: number
+  setCharacterLerpSpeed: (speed: number) => void
+  characterMaxSpeed: number
+  setCharacterMaxSpeed: (speed: number) => void
   unlockArea: (id: string) => void
   setActiveContent: (id: string | null) => void
   toggleHintZones: () => void
   toggleHotspotZones: () => void
   setCameraDragLocked: (locked: boolean) => void
-  setActiveEditorPanel: (panel: 'none' | 'colliders' | 'clickzones' | 'hints') => void
+  setActiveEditorPanel: (panel: 'none' | 'colliders' | 'clickzones' | 'hints' | 'motion') => void
   toggleEditorMode: () => void
   setIsEditingText: (editing: boolean) => void
   updateContentAreaMeta: (id: string, patch: Partial<Pick<ContentArea, 'title' | 'worldPosition' | 'interactionRadius' | 'panelConfig'>>) => void
@@ -272,6 +347,23 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
   spriteSetup: loadSpriteSetup(),
   gardens: loadGardens(),
   activeGardenId: loadActiveGardenId(),
+  motionThresholds: loadMotionThresholds(),
+  setMotionThresholds: (patch) =>
+    set((state) => {
+      const updated = { ...state.motionThresholds, ...patch }
+      saveMotionThresholds(updated)
+      return { motionThresholds: updated }
+    }),
+  characterLerpSpeed: loadCharacterLerpSpeed(),
+  setCharacterLerpSpeed: (speed) => {
+    saveCharacterLerpSpeed(speed)
+    set({ characterLerpSpeed: speed })
+  },
+  characterMaxSpeed: loadCharacterMaxSpeed(),
+  setCharacterMaxSpeed: (speed) => {
+    saveCharacterMaxSpeed(speed)
+    set({ characterMaxSpeed: speed })
+  },
   unlockArea: (id) =>
     set((state) => ({
       contentAreas: state.contentAreas.map((area) =>

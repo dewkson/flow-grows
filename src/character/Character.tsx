@@ -3,31 +3,25 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { characterPosition } from './characterPosition'
+import { characterMotion } from './characterMotion'
 import { resolveCollisions } from './collision'
 import { CHARACTER_BOUND } from '../world/constants'
-import { useGardenStore } from '../store/gardenStore'
+import { useGardenStore, type MotionThresholds } from '../store/gardenStore'
 
 /** Initial camera XZ offset – must match the value in App.tsx */
 const INITIAL_CAM_X = 5
 const INITIAL_CAM_Z = 5
 
-/** How fast the character catches up (0 = never, 1 = instant) */
-const LERP_SPEED = 0.02
-const FACING_DEADZONE = 0.01
-const AXIS_SWITCH_HYSTERESIS = 1.2
+/** Rotation lerp speed (0 = never, 1 = instant) */
 const ROTATION_LERP = 0.12
-const WALK_THRESHOLD = 0.02
 
-type FacingDirection = 'front' | 'back' | 'left' | 'right'
+/** World-unit movement below which facing is frozen (avoids jitter near-zero movement) */
+const FACING_DEADZONE = 0.001
 
-// Avaturn.me avatar faces -Z by default.
-// Map each game-direction to the Y-rotation that aligns the model with movement.
-const FACING_ROTATION: Record<FacingDirection, number> = {
-  back:  0,              // moving -Z → keep default -Z facing
-  front: Math.PI,        // moving +Z → flip 180°
-  left:  Math.PI / 2,    // moving -X → rotate 90°
-  right: -Math.PI / 2,   // moving +X → rotate -90°
-}
+/** Smoothing factor for the speed estimate (0 = no smoothing, 1 = instant) */
+const SPEED_SMOOTHING = 0.25
+
+type MotionState = 'idle' | 'walk' | 'run'
 
 /** Shortest-path angle lerp (handles ±PI wrap-around). */
 function lerpAngle(current: number, target: number, t: number): number {
@@ -36,29 +30,26 @@ function lerpAngle(current: number, target: number, t: number): number {
   return current + delta * t
 }
 
-function selectFacingFromLerp(
-  deltaX: number,
-  deltaZ: number,
-  currentFacing: FacingDirection,
-): FacingDirection {
-  const absX = Math.abs(deltaX)
-  const absZ = Math.abs(deltaZ)
-
-  if (absX + absZ <= FACING_DEADZONE) return currentFacing
-
-  const isCurrentHorizontal = currentFacing === 'left' || currentFacing === 'right'
-  const isCurrentVertical = currentFacing === 'front' || currentFacing === 'back'
-
-  if (isCurrentHorizontal && absZ > absX * AXIS_SWITCH_HYSTERESIS) {
-    return deltaZ > 0 ? 'front' : 'back'
+/**
+ * Determine the next motion state from the current one + smoothed speed, using hysteresis
+ * bands (separate enter/exit thresholds, live-tunable via the editor's motion panel) to
+ * avoid flicker between animation states at the boundaries.
+ */
+function nextMotionState(
+  current: MotionState,
+  speed: number,
+  thresholds: MotionThresholds,
+): MotionState {
+  switch (current) {
+    case 'idle':
+      return speed > thresholds.walkEnter ? 'walk' : 'idle'
+    case 'walk':
+      if (speed > thresholds.runEnter) return 'run'
+      if (speed < thresholds.walkExit) return 'idle'
+      return 'walk'
+    case 'run':
+      return speed < thresholds.runExit ? 'walk' : 'run'
   }
-
-  if (isCurrentVertical && absX > absZ * AXIS_SWITCH_HYSTERESIS) {
-    return deltaX > 0 ? 'right' : 'left'
-  }
-
-  if (absX > absZ) return deltaX > 0 ? 'right' : 'left'
-  return deltaZ > 0 ? 'front' : 'back'
 }
 
 useGLTF.preload('/models/Character/character.glb')
@@ -66,9 +57,9 @@ useGLTF.preload('/models/Character/character.glb')
 export function Character() {
   const groupRef = useRef<THREE.Group>(null)
   const { camera } = useThree()
-  const facingRef = useRef<FacingDirection>('front')
-  const targetRotationRef = useRef(FACING_ROTATION.front)
-  const isMovingRef = useRef(false)
+  const targetRotationRef = useRef(0)
+  const motionStateRef = useRef<MotionState>('idle')
+  const speedRef = useRef(0)
 
   const { scene, animations } = useGLTF('/models/Character/character.glb')
   // Bind the mixer directly to the scene so bone track names resolve correctly
@@ -76,6 +67,18 @@ export function Character() {
 
   const idleAnim = useMemo(() => names.find(n => /idle/i.test(n)) ?? names[0], [names])
   const walkAnim = useMemo(() => names.find(n => /walk/i.test(n)), [names])
+  const runAnim = useMemo(() => names.find(n => /run/i.test(n)), [names])
+
+  // Resolve each motion state to an available clip, falling back down the chain
+  // (run → walk → idle) so nothing breaks if a clip is missing/named differently.
+  const clipForState = useMemo(
+    () => ({
+      idle: idleAnim,
+      walk: walkAnim ?? idleAnim,
+      run: runAnim ?? walkAnim ?? idleAnim,
+    }),
+    [idleAnim, walkAnim, runAnim],
+  )
 
   // Enable shadows on all meshes in the model
   useEffect(() => {
@@ -88,9 +91,11 @@ export function Character() {
   useEffect(() => {
     if (!idleAnim) return
     actions[idleAnim]?.reset().play()
+    motionStateRef.current = 'idle'
+    characterMotion.state = 'idle'
   }, [actions, idleAnim, names])
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     if (!groupRef.current) return
 
     // Freeze movement when embed panel is open
@@ -112,12 +117,26 @@ export function Character() {
       CHARACTER_BOUND,
     )
 
-    const intendedDeltaX = targetX - currentX
-    const intendedDeltaZ = targetZ - currentZ
+    // Live-tunable via the editor's motion panel
+    const lerpSpeed = useGardenStore.getState().characterLerpSpeed
+    const maxSpeed = useGardenStore.getState().characterMaxSpeed
 
     // Lerp only X and Z – Y (height above ground) stays constant
-    groupRef.current.position.x += (targetX - groupRef.current.position.x) * LERP_SPEED
-    groupRef.current.position.z += (targetZ - groupRef.current.position.z) * LERP_SPEED
+    let stepX = (targetX - groupRef.current.position.x) * lerpSpeed
+    let stepZ = (targetZ - groupRef.current.position.z) * lerpSpeed
+
+    // Cap the per-frame movement so the character never exceeds characterMaxSpeed,
+    // regardless of how far behind the camera target it is (e.g. after a fast drag).
+    const maxStep = maxSpeed * delta
+    const stepMagnitude = Math.hypot(stepX, stepZ)
+    if (stepMagnitude > maxStep && stepMagnitude > 0) {
+      const scale = maxStep / stepMagnitude
+      stepX *= scale
+      stepZ *= scale
+    }
+
+    groupRef.current.position.x += stepX
+    groupRef.current.position.z += stepZ
 
     // Resolve collisions with placed colliders
     const colliders = useGardenStore.getState().colliders
@@ -129,11 +148,21 @@ export function Character() {
     groupRef.current.position.x = resolvedX
     groupRef.current.position.z = resolvedZ
 
-    // Update facing & smoothly rotate model toward movement direction
-    const nextFacing = selectFacingFromLerp(intendedDeltaX, intendedDeltaZ, facingRef.current)
-    if (facingRef.current !== nextFacing) {
-      facingRef.current = nextFacing
-      targetRotationRef.current = FACING_ROTATION[nextFacing]
+    // Actual distance covered this frame (post camera-lerp + collision resolution) –
+    // used for both facing and animation speed, so visuals match real motion
+    // (e.g. facing the slide direction when sliding along a collider).
+    const actualDeltaX = resolvedX - currentX
+    const actualDeltaZ = resolvedZ - currentZ
+    const moveMagnitude = Math.hypot(actualDeltaX, actualDeltaZ)
+
+    // Smoothed speed estimate (world units/sec) drives idle/walk/run switching
+    const instantSpeed = delta > 0 ? moveMagnitude / delta : 0
+    speedRef.current += (instantSpeed - speedRef.current) * SPEED_SMOOTHING
+    characterMotion.speed = speedRef.current
+
+    // Continuously face the direction actually moved (matches the model's -Z default facing)
+    if (moveMagnitude > FACING_DEADZONE) {
+      targetRotationRef.current = Math.atan2(actualDeltaX, actualDeltaZ)
     }
     groupRef.current.rotation.y = lerpAngle(
       groupRef.current.rotation.y,
@@ -141,20 +170,18 @@ export function Character() {
       ROTATION_LERP,
     )
 
-    // Switch idle ↔ walk animations based on movement.
-    // Only modify animations when walkAnim exists – otherwise idle runs
-    // uninterrupted and reset() never causes a T-pose flash.
-    const isMoving = Math.abs(intendedDeltaX) + Math.abs(intendedDeltaZ) > WALK_THRESHOLD
-    if (isMoving !== isMovingRef.current) {
-      isMovingRef.current = isMoving
-      if (walkAnim) {
-        if (isMoving) {
-          actions[idleAnim]?.fadeOut(0.2)
-          actions[walkAnim]?.reset().fadeIn(0.2).play()
-        } else {
-          actions[walkAnim]?.fadeOut(0.2)
-          if (idleAnim) actions[idleAnim]?.reset().fadeIn(0.2).play()
-        }
+    // Switch idle/walk/run animations based on smoothed speed, with hysteresis
+    // to avoid flicker at the thresholds. Thresholds are live-tunable via the editor panel.
+    const thresholds = useGardenStore.getState().motionThresholds
+    const nextState = nextMotionState(motionStateRef.current, speedRef.current, thresholds)
+    if (nextState !== motionStateRef.current) {
+      const prevClip = clipForState[motionStateRef.current]
+      const nextClip = clipForState[nextState]
+      motionStateRef.current = nextState
+      characterMotion.state = nextState
+      if (nextClip !== prevClip) {
+        if (prevClip) actions[prevClip]?.fadeOut(0.2)
+        if (nextClip) actions[nextClip]?.reset().fadeIn(0.2).play()
       }
     }
 

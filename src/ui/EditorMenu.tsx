@@ -7,7 +7,7 @@ export function EditorMenu() {
 
   if (!editorMode) return null
 
-  const togglePanel = (panel: 'colliders' | 'clickzones' | 'hints') => {
+  const togglePanel = (panel: 'colliders' | 'clickzones' | 'hints' | 'motion') => {
     setActiveEditorPanel(activeEditorPanel === panel ? 'none' : panel)
   }
 
@@ -54,6 +54,17 @@ export function EditorMenu() {
         title="Hints bearbeiten"
       >
         Hints
+      </button>
+
+      <button
+        onClick={() => togglePanel('motion')}
+        style={{
+          ...buttonStyle,
+          background: activeEditorPanel === 'motion' ? 'rgba(34, 197, 94, 0.95)' : 'rgba(51, 65, 85, 0.92)',
+        }}
+        title="Bewegungs-Schwellwerte einstellen"
+      >
+        Bewegung
       </button>
     </div>
   )
