@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useGardenStore } from '../store/gardenStore'
 import { createCollider } from '../data/collider'
+import type { Collider } from '../data/collider'
 import { characterPosition } from '../character/characterPosition'
 
 export function ColliderPanel() {
@@ -148,7 +149,9 @@ export function ColliderPanel() {
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 11, opacity: 0.6 }}>
-              Pos: ({c.position[0].toFixed(1)}, {c.position[1].toFixed(1)}) | {c.size[0].toFixed(1)} x {c.size[1].toFixed(1)}
+              Pos: ({c.position[0].toFixed(1)}, {c.position[1].toFixed(1)}) |{' '}
+              {c.shape === 'cylinder' ? `Zylinder r=${c.radius.toFixed(1)}` : `Box ${c.size[0].toFixed(1)} x ${c.size[1].toFixed(1)}`} |{' '}
+              {Math.round((c.rotationY * 180) / Math.PI)}°
             </span>
             <button
               onClick={(e) => {
@@ -174,6 +177,21 @@ export function ColliderPanel() {
       {selected && (
         <div style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 12 }}>
           <strong style={{ fontSize: 12 }}>Ausgewählt</strong>
+          <label style={{ fontSize: 11, display: 'block', marginTop: 8 }}>
+            Grundform
+            <select
+              value={selected.shape}
+              onChange={(e) => updateCollider(selected.id, { shape: e.target.value as Collider['shape'] })}
+              style={{ ...inputStyle, ...selectStyle }}
+            >
+              <option value="box" style={optionStyle}>
+                Quader
+              </option>
+              <option value="cylinder" style={optionStyle}>
+                Zylinder
+              </option>
+            </select>
+          </label>
           <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
             <label style={{ fontSize: 11 }}>
               X
@@ -209,42 +227,82 @@ export function ColliderPanel() {
                 style={inputStyle}
               />
             </label>
-            <label style={{ fontSize: 11 }}>
-              Breite
-              <input
-                type="number"
-                step={0.5}
-                min={1}
-                value={selected.size[0]}
-                onFocus={() => setColliderUndoSnapshot(selected.id)}
-                onChange={(e) =>
-                  updateCollider(
-                    selected.id,
-                    { size: [Math.max(1, parseFloat(e.target.value) || 1), selected.size[1]] },
-                    { recordUndo: false },
-                  )
-                }
-                style={inputStyle}
-              />
-            </label>
-            <label style={{ fontSize: 11 }}>
-              Tiefe
-              <input
-                type="number"
-                step={0.5}
-                min={1}
-                value={selected.size[1]}
-                onFocus={() => setColliderUndoSnapshot(selected.id)}
-                onChange={(e) =>
-                  updateCollider(
-                    selected.id,
-                    { size: [selected.size[0], Math.max(1, parseFloat(e.target.value) || 1)] },
-                    { recordUndo: false },
-                  )
-                }
-                style={inputStyle}
-              />
-            </label>
+            {selected.shape === 'cylinder' ? (
+              <label style={{ fontSize: 11, gridColumn: '1 / -1' }}>
+                Radius
+                <input
+                  type="number"
+                  step={0.5}
+                  min={0.5}
+                  value={selected.radius}
+                  onFocus={() => setColliderUndoSnapshot(selected.id)}
+                  onChange={(e) =>
+                    updateCollider(
+                      selected.id,
+                      { radius: Math.max(0.5, parseFloat(e.target.value) || 0.5) },
+                      { recordUndo: false },
+                    )
+                  }
+                  style={inputStyle}
+                />
+              </label>
+            ) : (
+              <>
+                <label style={{ fontSize: 11 }}>
+                  Breite
+                  <input
+                    type="number"
+                    step={0.5}
+                    min={1}
+                    value={selected.size[0]}
+                    onFocus={() => setColliderUndoSnapshot(selected.id)}
+                    onChange={(e) =>
+                      updateCollider(
+                        selected.id,
+                        { size: [Math.max(1, parseFloat(e.target.value) || 1), selected.size[1]] },
+                        { recordUndo: false },
+                      )
+                    }
+                    style={inputStyle}
+                  />
+                </label>
+                <label style={{ fontSize: 11 }}>
+                  Tiefe
+                  <input
+                    type="number"
+                    step={0.5}
+                    min={1}
+                    value={selected.size[1]}
+                    onFocus={() => setColliderUndoSnapshot(selected.id)}
+                    onChange={(e) =>
+                      updateCollider(
+                        selected.id,
+                        { size: [selected.size[0], Math.max(1, parseFloat(e.target.value) || 1)] },
+                        { recordUndo: false },
+                      )
+                    }
+                    style={inputStyle}
+                  />
+                </label>
+                <label style={{ fontSize: 11, gridColumn: '1 / -1' }}>
+                  Rotation (Grad)
+                  <input
+                    type="number"
+                    step={5}
+                    value={Math.round((selected.rotationY * 180) / Math.PI)}
+                    onFocus={() => setColliderUndoSnapshot(selected.id)}
+                    onChange={(e) =>
+                      updateCollider(
+                        selected.id,
+                        { rotationY: ((parseFloat(e.target.value) || 0) * Math.PI) / 180 },
+                        { recordUndo: false },
+                      )
+                    }
+                    style={inputStyle}
+                  />
+                </label>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -262,4 +320,15 @@ const inputStyle: React.CSSProperties = {
   borderRadius: 4,
   color: '#fff',
   fontSize: 12,
+}
+
+// Native <option> elements ignore the parent's translucent background in most browsers and
+// fall back to an OS-level white dropdown list, which paired with white text was unreadable.
+const selectStyle: React.CSSProperties = {
+  background: '#1e1e1e',
+}
+
+const optionStyle: React.CSSProperties = {
+  background: '#1e1e1e',
+  color: '#fff',
 }

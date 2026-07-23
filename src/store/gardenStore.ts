@@ -51,6 +51,9 @@ type ColliderUndoSnapshot = {
   id: string
   position: [number, number]
   size: [number, number]
+  radius: number
+  rotationY: number
+  shape: Collider['shape']
 }
 
 type UpdateColliderOptions = {
@@ -147,7 +150,17 @@ function loadColliders(): Collider[] {
   try {
     const raw = localStorage.getItem(COLLIDER_STORAGE_KEY)
     if (!raw) return []
-    return JSON.parse(raw) as Collider[]
+    const parsed = JSON.parse(raw) as Partial<Collider>[]
+    if (!Array.isArray(parsed)) return []
+    // Migrate colliders saved before shape/rotation/radius existed
+    return parsed.map((c) => ({
+      id: c.id!,
+      position: c.position!,
+      size: c.size ?? [4, 4],
+      radius: c.radius ?? (c.size ? c.size[0] / 2 : 2),
+      rotationY: c.rotationY ?? 0,
+      shape: c.shape ?? 'box',
+    }))
   } catch {
     return []
   }
@@ -388,7 +401,7 @@ type GardenStoreState = {
   undoLastColliderChange: () => void
   updateCollider: (
     id: string,
-    patch: Partial<Pick<Collider, 'position' | 'size'>>,
+    patch: Partial<Pick<Collider, 'position' | 'size' | 'radius' | 'rotationY' | 'shape'>>,
     options?: UpdateColliderOptions,
   ) => void
   selectCollider: (id: string | null) => void
@@ -592,6 +605,9 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
           id: collider.id,
           position: [...collider.position] as [number, number],
           size: [...collider.size] as [number, number],
+          radius: collider.radius,
+          rotationY: collider.rotationY,
+          shape: collider.shape,
         },
         canUndoColliderChange: true,
       }
@@ -611,6 +627,9 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
         ...updated[idx],
         position: [...snapshot.position],
         size: [...snapshot.size],
+        radius: snapshot.radius,
+        rotationY: snapshot.rotationY,
+        shape: snapshot.shape,
       }
       saveColliders(updated)
 
@@ -642,6 +661,9 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
           id: current.id,
           position: [...current.position] as [number, number],
           size: [...current.size] as [number, number],
+          radius: current.radius,
+          rotationY: current.rotationY,
+          shape: current.shape,
         },
         canUndoColliderChange: true,
       }
