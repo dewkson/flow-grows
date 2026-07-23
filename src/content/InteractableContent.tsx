@@ -11,14 +11,16 @@ type InteractableContentProps = {
 
 export function InteractableContent({ data }: InteractableContentProps) {
   const showHintZones = useGardenStore((s) => s.showHintZones)
+  const hintsEnabled = useGardenStore((s) => s.hintsEnabled)
   const radius = data.interactionRadius ?? 2.5
   const isNearby = useProximity(data.worldPosition, radius)
+  const showContent = isNearby && hintsEnabled
 
   return (
     <group position={data.worldPosition}>
       {/* Rotated sub-group for text (faces camera) */}
       <group rotation={data.rotation ?? [0, 0, 0]}>
-        {renderContent(data, isNearby)}
+        {renderContent(data, showContent)}
       </group>
 
       {/* Debug zone on the ground – outside rotation so it stays flat */}

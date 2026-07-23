@@ -5,12 +5,7 @@ export type ModelCatalogEntry = {
 }
 
 export const MODEL_CATALOG: ModelCatalogEntry[] = [
-  { path: '/models/Blender/bush.glb', label: 'Busch' },
-  { path: '/models/Blender/rock.glb', label: 'Stein' },
-  { path: '/models/Blender/tree_conifer.glb', label: 'Nadelbaum' },
-  { path: '/models/Blender/tree_deciduous.glb', label: 'Laubbaum' },
   { path: '/models/Blender/Isle Road.glb', label: 'Weg-Insel' },
   { path: '/models/Blender/Isle Origintree.glb', label: 'Origintree-Insel' },
-  { path: '/models/Blender/Hextile Origintree.glb', label: 'Hextile Origintree' },
-  { path: '/models/Blender/Hextile Music.glb', label: 'Hextile Music' },
+  { path: '/models/Blender/Isle Music.glb', label: 'Music-Insel' },
 ]

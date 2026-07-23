@@ -15,6 +15,8 @@ export function ContentAreaPanel() {
   const setActiveEditorPanel = useGardenStore((s) => s.setActiveEditorPanel)
   const showHintZones = useGardenStore((s) => s.showHintZones)
   const toggleHintZones = useGardenStore((s) => s.toggleHintZones)
+  const hintsEnabled = useGardenStore((s) => s.hintsEnabled)
+  const toggleHintsEnabled = useGardenStore((s) => s.toggleHintsEnabled)
   const contentAreas = useGardenStore((s) => s.contentAreas)
   const updateContentText = useGardenStore((s) => s.updateContentText)
   const updateContentAreaMeta = useGardenStore((s) => s.updateContentAreaMeta)
@@ -46,6 +48,16 @@ export function ContentAreaPanel() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <strong style={{ fontSize: 14 }}>Hints ({contentAreas.length})</strong>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, opacity: 0.9 }}>
+            <input
+              type="checkbox"
+              checked={hintsEnabled}
+              onChange={(e) => {
+                if (e.target.checked !== hintsEnabled) toggleHintsEnabled()
+              }}
+            />
+            Hints aktiv
+          </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, opacity: 0.9 }}>
             <input
               type="checkbox"

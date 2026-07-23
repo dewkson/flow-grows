@@ -17,6 +17,7 @@ const CLICK_ZONE_STORAGE_KEY = 'flow-grows-click-zones'
 const LINKED_CLICK_ZONE_STORAGE_KEY = 'flow-grows-linked-click-zones'
 const CONTENT_AREA_META_STORAGE_KEY = 'flow-grows-content-area-meta'
 const GARDENS_STORAGE_KEY = 'flow-grows-gardens'
+const HINTS_ENABLED_KEY = 'flow-grows-hints-enabled'
 const ACTIVE_GARDEN_KEY = 'flow-grows-active-garden'
 const SPRITE_SETUP_KEY = 'flow-grows-sprite-setup'
 const MOTION_THRESHOLDS_KEY = 'flow-grows-motion-thresholds'
@@ -244,6 +245,20 @@ function saveCharacterLerpSpeed(speed: number) {
   localStorage.setItem(CHARACTER_LERP_SPEED_KEY, String(speed))
 }
 
+function loadHintsEnabled(): boolean {
+  try {
+    const raw = localStorage.getItem(HINTS_ENABLED_KEY)
+    if (raw === null) return true
+    return raw === 'true'
+  } catch {
+    return true
+  }
+}
+
+function saveHintsEnabled(enabled: boolean) {
+  localStorage.setItem(HINTS_ENABLED_KEY, String(enabled))
+}
+
 function loadCharacterMaxSpeed(): number {
   try {
     const raw = localStorage.getItem(CHARACTER_MAX_SPEED_KEY)
@@ -350,6 +365,7 @@ type GardenStoreState = {
   contentAreas: ContentArea[]
   activeContentId: string | null
   showHintZones: boolean
+  hintsEnabled: boolean
   showHotspotZones: boolean
   cameraDragLocked: boolean
   activeEditorPanel: 'none' | 'colliders' | 'clickzones' | 'hints' | 'motion' | 'models'
@@ -380,6 +396,7 @@ type GardenStoreState = {
   unlockArea: (id: string) => void
   setActiveContent: (id: string | null) => void
   toggleHintZones: () => void
+  toggleHintsEnabled: () => void
   toggleHotspotZones: () => void
   setCameraDragLocked: (locked: boolean) => void
   setActiveEditorPanel: (panel: 'none' | 'colliders' | 'clickzones' | 'hints' | 'motion' | 'models') => void
@@ -421,6 +438,7 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
   contentAreas: loadContentAreas(),
   activeContentId: null,
   showHintZones: false,
+  hintsEnabled: loadHintsEnabled(),
   showHotspotZones: false,
   cameraDragLocked: false,
   activeEditorPanel: 'none',
@@ -473,6 +491,12 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
     })),
   setActiveContent: (id) => set({ activeContentId: id }),
   toggleHintZones: () => set((state) => ({ showHintZones: !state.showHintZones })),
+  toggleHintsEnabled: () =>
+    set((state) => {
+      const next = !state.hintsEnabled
+      saveHintsEnabled(next)
+      return { hintsEnabled: next }
+    }),
   toggleHotspotZones: () => set((state) => ({ showHotspotZones: !state.showHotspotZones })),
   setCameraDragLocked: (locked) => set({ cameraDragLocked: locked }),
   setActiveEditorPanel: (panel) => set({ activeEditorPanel: panel }),
