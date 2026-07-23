@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { Scene } from './canvas/Scene'
 import { ModeToggle } from './ui/ModeToggle'
 import { ColliderPanel } from './ui/ColliderPanel'
+import { PlacedModelPanel } from './ui/PlacedModelPanel'
 import { EmbedPanel } from './content/EmbedPanel'
 import { ClickZonePanel } from './ui/ClickZonePanel'
 import { EditorMenu } from './ui/EditorMenu'
@@ -27,6 +28,7 @@ function App() {
       <ModeToggle />
       <EditorMenu />
       <ColliderPanel />
+      <PlacedModelPanel />
       <ClickZonePanel />
       <ContentAreaPanel />
       <EmbedPanel />

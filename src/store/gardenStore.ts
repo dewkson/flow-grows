@@ -7,9 +7,11 @@ import {
   type LinkedClickZone,
 } from '../data/contentArea'
 import type { Collider } from '../data/collider'
+import type { PlacedModel } from '../data/placedModel'
 
 const STORAGE_KEY = 'flow-grows-content'
 const COLLIDER_STORAGE_KEY = 'flow-grows-colliders'
+const PLACED_MODELS_STORAGE_KEY = 'flow-grows-placed-models'
 const EMBED_STORAGE_KEY = 'flow-grows-embeds'
 const CLICK_ZONE_STORAGE_KEY = 'flow-grows-click-zones'
 const LINKED_CLICK_ZONE_STORAGE_KEY = 'flow-grows-linked-click-zones'
@@ -20,6 +22,8 @@ const SPRITE_SETUP_KEY = 'flow-grows-sprite-setup'
 const MOTION_THRESHOLDS_KEY = 'flow-grows-motion-thresholds'
 const CHARACTER_LERP_SPEED_KEY = 'flow-grows-character-lerp-speed'
 const CHARACTER_MAX_SPEED_KEY = 'flow-grows-character-max-speed'
+const CHARACTER_FOLLOW_DEADZONE_KEY = 'flow-grows-character-follow-deadzone'
+const CHARACTER_FOLLOW_CATCH_UP_KEY = 'flow-grows-character-follow-catch-up'
 
 export type SpriteConfig = {
   url: string
@@ -40,6 +44,7 @@ export type GardenSnapshot = {
   contentAreas: ContentArea[]
   colliders: Collider[]
   linkedClickZones: LinkedClickZone[]
+  placedModels: PlacedModel[]
 }
 
 type ColliderUndoSnapshot = {
@@ -76,6 +81,23 @@ export const DEFAULT_CHARACTER_LERP_SPEED = 0.1
 
 /** Hard cap on movement speed (world units/sec), independent of the lerp factor. */
 export const DEFAULT_CHARACTER_MAX_SPEED = 12
+
+/**
+ * "Activation energy" for movement: while resting, the camera-derived target must move
+ * further than this radius (world units) away from the character before it starts
+ * following at all – tiny swipes never move the character or trigger animation.
+ */
+export const DEFAULT_CHARACTER_FOLLOW_DEADZONE = 0.2
+
+/**
+ * Once following, the character keeps chasing the target continuously (ignoring the
+ * enter radius above) until the remaining distance drops below this much smaller value –
+ * i.e. it has essentially caught up – before returning to the resting state. This
+ * hysteresis (separate enter/exit thresholds, same pattern as MotionThresholds) prevents
+ * the stop/go flicker that a single shared threshold would cause during a slow, continuous
+ * drag.
+ */
+export const DEFAULT_CHARACTER_FOLLOW_CATCH_UP = 0.03
 
 /** Merge saved text overrides into the default content areas */
 function loadContentAreas(): ContentArea[] {
@@ -133,6 +155,20 @@ function loadColliders(): Collider[] {
 
 function saveColliders(colliders: Collider[]) {
   localStorage.setItem(COLLIDER_STORAGE_KEY, JSON.stringify(colliders))
+}
+
+function loadPlacedModels(): PlacedModel[] {
+  try {
+    const raw = localStorage.getItem(PLACED_MODELS_STORAGE_KEY)
+    if (!raw) return []
+    return JSON.parse(raw) as PlacedModel[]
+  } catch {
+    return []
+  }
+}
+
+function savePlacedModels(placedModels: PlacedModel[]) {
+  localStorage.setItem(PLACED_MODELS_STORAGE_KEY, JSON.stringify(placedModels))
 }
 
 function loadSpriteSetup(): SpriteConfig[] {
@@ -210,6 +246,36 @@ function saveCharacterMaxSpeed(speed: number) {
   localStorage.setItem(CHARACTER_MAX_SPEED_KEY, String(speed))
 }
 
+function loadCharacterFollowDeadzone(): number {
+  try {
+    const raw = localStorage.getItem(CHARACTER_FOLLOW_DEADZONE_KEY)
+    if (!raw) return DEFAULT_CHARACTER_FOLLOW_DEADZONE
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) ? parsed : DEFAULT_CHARACTER_FOLLOW_DEADZONE
+  } catch {
+    return DEFAULT_CHARACTER_FOLLOW_DEADZONE
+  }
+}
+
+function saveCharacterFollowDeadzone(radius: number) {
+  localStorage.setItem(CHARACTER_FOLLOW_DEADZONE_KEY, String(radius))
+}
+
+function loadCharacterFollowCatchUp(): number {
+  try {
+    const raw = localStorage.getItem(CHARACTER_FOLLOW_CATCH_UP_KEY)
+    if (!raw) return DEFAULT_CHARACTER_FOLLOW_CATCH_UP
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) ? parsed : DEFAULT_CHARACTER_FOLLOW_CATCH_UP
+  } catch {
+    return DEFAULT_CHARACTER_FOLLOW_CATCH_UP
+  }
+}
+
+function saveCharacterFollowCatchUp(distance: number) {
+  localStorage.setItem(CHARACTER_FOLLOW_CATCH_UP_KEY, String(distance))
+}
+
 function loadActiveGardenId(): string | null {
   return localStorage.getItem(ACTIVE_GARDEN_KEY)
 }
@@ -273,7 +339,7 @@ type GardenStoreState = {
   showHintZones: boolean
   showHotspotZones: boolean
   cameraDragLocked: boolean
-  activeEditorPanel: 'none' | 'colliders' | 'clickzones' | 'hints' | 'motion'
+  activeEditorPanel: 'none' | 'colliders' | 'clickzones' | 'hints' | 'motion' | 'models'
   editorMode: boolean
   isEditingText: boolean
   isEmbedOpen: boolean
@@ -283,6 +349,8 @@ type GardenStoreState = {
   selectedColliderId: string | null
   lastColliderUndo: ColliderUndoSnapshot | null
   canUndoColliderChange: boolean
+  placedModels: PlacedModel[]
+  selectedPlacedModelId: string | null
   spriteSetup: SpriteConfig[]
   gardens: GardenSnapshot[]
   activeGardenId: string | null
@@ -292,12 +360,16 @@ type GardenStoreState = {
   setCharacterLerpSpeed: (speed: number) => void
   characterMaxSpeed: number
   setCharacterMaxSpeed: (speed: number) => void
+  characterFollowDeadzone: number
+  setCharacterFollowDeadzone: (radius: number) => void
+  characterFollowCatchUp: number
+  setCharacterFollowCatchUp: (distance: number) => void
   unlockArea: (id: string) => void
   setActiveContent: (id: string | null) => void
   toggleHintZones: () => void
   toggleHotspotZones: () => void
   setCameraDragLocked: (locked: boolean) => void
-  setActiveEditorPanel: (panel: 'none' | 'colliders' | 'clickzones' | 'hints' | 'motion') => void
+  setActiveEditorPanel: (panel: 'none' | 'colliders' | 'clickzones' | 'hints' | 'motion' | 'models') => void
   toggleEditorMode: () => void
   setIsEditingText: (editing: boolean) => void
   updateContentAreaMeta: (id: string, patch: Partial<Pick<ContentArea, 'title' | 'worldPosition' | 'interactionRadius' | 'panelConfig'>>) => void
@@ -320,6 +392,10 @@ type GardenStoreState = {
     options?: UpdateColliderOptions,
   ) => void
   selectCollider: (id: string | null) => void
+  addPlacedModel: (model: PlacedModel) => void
+  removePlacedModel: (id: string) => void
+  updatePlacedModel: (id: string, patch: Partial<Pick<PlacedModel, 'position' | 'positionY' | 'rotationY' | 'scale'>>) => void
+  selectPlacedModel: (id: string | null) => void
   setSpriteSetup: (setup: SpriteConfig[]) => void
   saveCurrentAsGarden: (name: string) => void
   overwriteCurrentGarden: () => void
@@ -344,6 +420,8 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
   selectedColliderId: null,
   lastColliderUndo: null,
   canUndoColliderChange: false,
+  placedModels: loadPlacedModels(),
+  selectedPlacedModelId: null,
   spriteSetup: loadSpriteSetup(),
   gardens: loadGardens(),
   activeGardenId: loadActiveGardenId(),
@@ -363,6 +441,16 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
   setCharacterMaxSpeed: (speed) => {
     saveCharacterMaxSpeed(speed)
     set({ characterMaxSpeed: speed })
+  },
+  characterFollowDeadzone: loadCharacterFollowDeadzone(),
+  setCharacterFollowDeadzone: (radius) => {
+    saveCharacterFollowDeadzone(radius)
+    set({ characterFollowDeadzone: radius })
+  },
+  characterFollowCatchUp: loadCharacterFollowCatchUp(),
+  setCharacterFollowCatchUp: (distance) => {
+    saveCharacterFollowCatchUp(distance)
+    set({ characterFollowCatchUp: distance })
   },
   unlockArea: (id) =>
     set((state) => ({
@@ -559,6 +647,28 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
       }
     }),
   selectCollider: (id) => set({ selectedColliderId: id }),
+  addPlacedModel: (model) =>
+    set((state) => {
+      const updated = [...state.placedModels, model]
+      savePlacedModels(updated)
+      return { placedModels: updated }
+    }),
+  removePlacedModel: (id) =>
+    set((state) => {
+      const updated = state.placedModels.filter((m) => m.id !== id)
+      savePlacedModels(updated)
+      return {
+        placedModels: updated,
+        selectedPlacedModelId: state.selectedPlacedModelId === id ? null : state.selectedPlacedModelId,
+      }
+    }),
+  updatePlacedModel: (id, patch) =>
+    set((state) => {
+      const updated = state.placedModels.map((m) => (m.id === id ? { ...m, ...patch } : m))
+      savePlacedModels(updated)
+      return { placedModels: updated }
+    }),
+  selectPlacedModel: (id) => set({ selectedPlacedModelId: id }),
   setSpriteSetup: (setup) => {
     saveSpriteSetup(setup)
     set({ spriteSetup: setup })
@@ -575,6 +685,7 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
         contentAreas: state.contentAreas,
         colliders: state.colliders,
         linkedClickZones: state.linkedClickZones,
+        placedModels: state.placedModels,
       }
       const updated = [...state.gardens, newGarden]
       saveGardens(updated)
@@ -594,6 +705,7 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
               contentAreas: state.contentAreas,
               colliders: state.colliders,
               linkedClickZones: state.linkedClickZones,
+              placedModels: state.placedModels,
             }
           : g,
       )
@@ -608,6 +720,7 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
       // Persist all individual keys so page reloads also use the correct data
       saveSpriteSetup(garden.spriteSetup)
       saveColliders(garden.colliders)
+      savePlacedModels(garden.placedModels ?? [])
       saveLinkedClickZones(garden.linkedClickZones)
 
       // Persist content area data
@@ -637,11 +750,13 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
         contentAreas: garden.contentAreas,
         colliders: garden.colliders,
         linkedClickZones: garden.linkedClickZones,
+        placedModels: garden.placedModels ?? [],
         activeGardenId: id,
         activeContentId: null,
         selectedColliderId: null,
         lastColliderUndo: null,
         canUndoColliderChange: false,
+        selectedPlacedModelId: null,
       }
     }),
   deleteGarden: (id) =>

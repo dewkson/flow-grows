@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useGardenStore, DEFAULT_MOTION_THRESHOLDS, DEFAULT_CHARACTER_LERP_SPEED, DEFAULT_CHARACTER_MAX_SPEED } from '../store/gardenStore'
+import { useGardenStore, DEFAULT_MOTION_THRESHOLDS, DEFAULT_CHARACTER_LERP_SPEED, DEFAULT_CHARACTER_MAX_SPEED, DEFAULT_CHARACTER_FOLLOW_DEADZONE, DEFAULT_CHARACTER_FOLLOW_CATCH_UP } from '../store/gardenStore'
 import { characterMotion } from '../character/characterMotion'
 
 type SliderRowProps = {
@@ -41,6 +41,10 @@ export function MotionPanel() {
   const setCharacterLerpSpeed = useGardenStore((s) => s.setCharacterLerpSpeed)
   const characterMaxSpeed = useGardenStore((s) => s.characterMaxSpeed)
   const setCharacterMaxSpeed = useGardenStore((s) => s.setCharacterMaxSpeed)
+  const characterFollowDeadzone = useGardenStore((s) => s.characterFollowDeadzone)
+  const setCharacterFollowDeadzone = useGardenStore((s) => s.setCharacterFollowDeadzone)
+  const characterFollowCatchUp = useGardenStore((s) => s.characterFollowCatchUp)
+  const setCharacterFollowCatchUp = useGardenStore((s) => s.setCharacterFollowCatchUp)
 
   const [liveSpeed, setLiveSpeed] = useState(0)
   const [liveState, setLiveState] = useState(characterMotion.state)
@@ -63,6 +67,8 @@ export function MotionPanel() {
     setMotionThresholds(DEFAULT_MOTION_THRESHOLDS)
     setCharacterLerpSpeed(DEFAULT_CHARACTER_LERP_SPEED)
     setCharacterMaxSpeed(DEFAULT_CHARACTER_MAX_SPEED)
+    setCharacterFollowDeadzone(DEFAULT_CHARACTER_FOLLOW_DEADZONE)
+    setCharacterFollowCatchUp(DEFAULT_CHARACTER_FOLLOW_CATCH_UP)
   }
 
   return (
@@ -154,6 +160,22 @@ export function MotionPanel() {
         max={30}
         step={0.5}
         onChange={setCharacterMaxSpeed}
+      />
+      <SliderRow
+        label="Aktivierungsschwelle (Radius bis Bewegung startet)"
+        value={characterFollowDeadzone}
+        min={0}
+        max={2}
+        step={0.02}
+        onChange={setCharacterFollowDeadzone}
+      />
+      <SliderRow
+        label="Nachlauf-Schwelle (Distanz bis Bewegung stoppt)"
+        value={characterFollowCatchUp}
+        min={0}
+        max={0.5}
+        step={0.01}
+        onChange={setCharacterFollowCatchUp}
       />
 
       <div style={{ fontSize: 11, opacity: 0.6, margin: '10px 0 4px', textTransform: 'uppercase', letterSpacing: 0.5 }}>

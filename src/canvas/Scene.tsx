@@ -5,6 +5,7 @@ import { CameraController } from './Camera'
 import { CameraFocus } from './CameraFocus'
 import { WorldContentManager } from '../content/WorldContentManager'
 import { GardenModels } from '../models/GardenModels'
+import { PlacedModels } from '../models/PlacedModels'
 import { ColliderSystem } from '../world/ColliderSystem'
 
 export function Scene() {
@@ -16,6 +17,7 @@ export function Scene() {
       <Lights />
       <Ground />
       <GardenModels />
+      <PlacedModels />
       <Character />
       <WorldContentManager />
       <ColliderSystem />

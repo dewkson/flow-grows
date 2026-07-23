@@ -60,6 +60,7 @@ export function Character() {
   const targetRotationRef = useRef(0)
   const motionStateRef = useRef<MotionState>('idle')
   const speedRef = useRef(0)
+  const followStateRef = useRef<'resting' | 'following'>('resting')
 
   const { scene, animations } = useGLTF('/models/Character/character.glb')
   // Bind the mixer directly to the scene so bone track names resolve correctly
@@ -120,10 +121,33 @@ export function Character() {
     // Live-tunable via the editor's motion panel
     const lerpSpeed = useGardenStore.getState().characterLerpSpeed
     const maxSpeed = useGardenStore.getState().characterMaxSpeed
+    const followDeadzone = useGardenStore.getState().characterFollowDeadzone
+    const followCatchUp = useGardenStore.getState().characterFollowCatchUp
+
+    // "Activation energy" for movement, with hysteresis (same idea as the walk/run
+    // thresholds below) so a slow, continuous swipe doesn't stutter start/stop:
+    // while resting, the target must pull further than followDeadzone away before the
+    // character starts following at all; once following, it keeps chasing continuously
+    // (ignoring followDeadzone) until it has essentially caught up (< followCatchUp)
+    // before going back to resting. Tiny swipes that never cross followDeadzone never
+    // move the character or trigger the idle→walk animation.
+    const targetDistance = Math.hypot(
+      targetX - groupRef.current.position.x,
+      targetZ - groupRef.current.position.z,
+    )
+    if (followStateRef.current === 'resting') {
+      if (targetDistance > followDeadzone) followStateRef.current = 'following'
+    } else if (targetDistance < followCatchUp) {
+      followStateRef.current = 'resting'
+    }
 
     // Lerp only X and Z – Y (height above ground) stays constant
-    let stepX = (targetX - groupRef.current.position.x) * lerpSpeed
-    let stepZ = (targetZ - groupRef.current.position.z) * lerpSpeed
+    let stepX = 0
+    let stepZ = 0
+    if (followStateRef.current === 'following') {
+      stepX = (targetX - groupRef.current.position.x) * lerpSpeed
+      stepZ = (targetZ - groupRef.current.position.z) * lerpSpeed
+    }
 
     // Cap the per-frame movement so the character never exceeds characterMaxSpeed,
     // regardless of how far behind the camera target it is (e.g. after a fast drag).

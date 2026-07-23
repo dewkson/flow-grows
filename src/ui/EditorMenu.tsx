@@ -7,7 +7,7 @@ export function EditorMenu() {
 
   if (!editorMode) return null
 
-  const togglePanel = (panel: 'colliders' | 'clickzones' | 'hints' | 'motion') => {
+  const togglePanel = (panel: 'colliders' | 'clickzones' | 'hints' | 'motion' | 'models') => {
     setActiveEditorPanel(activeEditorPanel === panel ? 'none' : panel)
   }
 
@@ -65,6 +65,17 @@ export function EditorMenu() {
         title="Bewegungs-Schwellwerte einstellen"
       >
         Bewegung
+      </button>
+
+      <button
+        onClick={() => togglePanel('models')}
+        style={{
+          ...buttonStyle,
+          background: activeEditorPanel === 'models' ? 'rgba(168, 85, 247, 0.95)' : 'rgba(51, 65, 85, 0.92)',
+        }}
+        title="Modelle platzieren"
+      >
+        Modelle
       </button>
     </div>
   )
