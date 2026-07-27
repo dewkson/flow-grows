@@ -22,3 +22,13 @@ export const CAM_OFFSET = 5
 /** Editor panels (Collider/Hotspot/Hint/Modell-Listen) show only items within this
  * XZ distance from the character by default, to keep large gardens overseeable. */
 export const EDITOR_LIST_RADIUS = 20
+
+/** Extra distance (beyond the character's + collider's combined solid radius) at which
+ * obstacle-avoidance steering starts nudging the character sideways around a collider
+ * it is heading straight into, so it can curve around obstacles instead of getting
+ * stuck pressing against them when the follow target lies behind one. */
+export const OBSTACLE_AVOIDANCE_MARGIN = 3
+
+/** How strongly the avoidance nudge deflects movement, as a multiple of the character's
+ * per-frame max-speed step. */
+export const OBSTACLE_AVOIDANCE_STRENGTH = 1.4

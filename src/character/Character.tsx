@@ -4,7 +4,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { characterPosition } from './characterPosition'
 import { characterMotion } from './characterMotion'
-import { resolveCollisions } from './collision'
+import { resolveCollisions, computeAvoidanceSteer } from './collision'
 import { CHARACTER_BOUND } from '../world/constants'
 import { useGardenStore, type MotionThresholds } from '../store/gardenStore'
 
@@ -149,6 +149,23 @@ export function Character() {
       stepZ = (targetZ - groupRef.current.position.z) * lerpSpeed
     }
 
+    // Steer sideways around colliders the character is heading straight into, so it can
+    // curve around obstacles to reach the target instead of getting stuck pressing against
+    // them (plain push-out collision alone can pin the character at a flat wall approached
+    // head-on, since the target sits directly behind it).
+    const colliders = useGardenStore.getState().colliders
+    if (followStateRef.current === 'following') {
+      const [avoidX, avoidZ] = computeAvoidanceSteer(
+        groupRef.current.position.x,
+        groupRef.current.position.z,
+        stepX,
+        stepZ,
+        colliders,
+      )
+      stepX += avoidX
+      stepZ += avoidZ
+    }
+
     // Cap the per-frame movement so the character never exceeds characterMaxSpeed,
     // regardless of how far behind the camera target it is (e.g. after a fast drag).
     const maxStep = maxSpeed * delta
@@ -163,7 +180,6 @@ export function Character() {
     groupRef.current.position.z += stepZ
 
     // Resolve collisions with placed colliders
-    const colliders = useGardenStore.getState().colliders
     const [resolvedX, resolvedZ] = resolveCollisions(
       groupRef.current.position.x,
       groupRef.current.position.z,
