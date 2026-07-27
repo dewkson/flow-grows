@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useGardenStore } from '../store/gardenStore'
 import { createCollider } from '../data/collider'
 import type { Collider } from '../data/collider'
-import { characterPosition } from '../character/characterPosition'
+import { characterPosition, usePolledCharacterPosition } from '../character/characterPosition'
+import { EDITOR_LIST_RADIUS } from '../world/constants'
 
 export function ColliderPanel() {
   const editorMode = useGardenStore((s) => s.editorMode)
@@ -17,6 +18,10 @@ export function ColliderPanel() {
   const undoLastColliderChange = useGardenStore((s) => s.undoLastColliderChange)
   const canUndoColliderChange = useGardenStore((s) => s.canUndoColliderChange)
   const selectCollider = useGardenStore((s) => s.selectCollider)
+
+  const [showAll, setShowAll] = useState(false)
+  const isOpen = editorMode && activeEditorPanel === 'colliders'
+  const livePos = usePolledCharacterPosition(isOpen && !showAll)
 
   useEffect(() => {
     if (!editorMode || activeEditorPanel !== 'colliders') return
@@ -45,6 +50,15 @@ export function ColliderPanel() {
   if (!editorMode || activeEditorPanel !== 'colliders') return null
 
   const selected = colliders.find((c) => c.id === selectedId)
+
+  const visibleColliders = showAll
+    ? colliders
+    : colliders.filter((c) => {
+        if (c.id === selectedId) return true
+        const dx = livePos.x - c.position[0]
+        const dz = livePos.z - c.position[1]
+        return dx * dx + dz * dz <= EDITOR_LIST_RADIUS * EDITOR_LIST_RADIUS
+      })
 
   const handleAdd = () => {
     const x = Math.round(characterPosition.x)
@@ -75,8 +89,10 @@ export function ColliderPanel() {
         border: '1px solid rgba(255,255,255,0.1)',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <strong style={{ fontSize: 14 }}>Colliders ({colliders.length})</strong>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <strong style={{ fontSize: 14 }}>
+          Colliders ({showAll ? colliders.length : `${visibleColliders.length}/${colliders.length}`})
+        </strong>
         <div style={{ display: 'flex', gap: 6 }}>
           <button
             onClick={handleAdd}
@@ -128,13 +144,28 @@ export function ColliderPanel() {
         </div>
       </div>
 
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, opacity: 0.9, marginBottom: 10 }}>
+        <input
+          type="checkbox"
+          checked={showAll}
+          onChange={(e) => setShowAll(e.target.checked)}
+        />
+        Alle anzeigen (statt nur Umgebung)
+      </label>
+
       {colliders.length === 0 && (
         <div style={{ opacity: 0.5, fontSize: 12 }}>
           Noch keine Collider vorhanden.
         </div>
       )}
 
-      {colliders.map((c) => (
+      {colliders.length > 0 && visibleColliders.length === 0 && (
+        <div style={{ opacity: 0.5, fontSize: 12 }}>
+          Keine Collider in der Nähe. "Alle anzeigen" aktivieren, um alle zu sehen.
+        </div>
+      )}
+
+      {visibleColliders.map((c) => (
         <div
           key={c.id}
           onClick={() => selectCollider(c.id)}

@@ -1,6 +1,8 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { ClickZone } from '../data/contentArea'
 import { useGardenStore } from '../store/gardenStore'
+import { usePolledCharacterPosition } from '../character/characterPosition'
+import { EDITOR_LIST_RADIUS } from '../world/constants'
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100
@@ -41,7 +43,21 @@ export function ClickZonePanel() {
 
   const linkableAreas = useMemo(() => contentAreas, [contentAreas])
 
-  if (!editorMode || activeEditorPanel !== 'clickzones') return null
+  const [showAll, setShowAll] = useState(false)
+  const isOpen = editorMode && activeEditorPanel === 'clickzones'
+  const livePos = usePolledCharacterPosition(isOpen && !showAll)
+
+  if (!isOpen) return null
+
+  const visibleClickZones = showAll
+    ? linkedClickZones
+    : linkedClickZones.filter((zoneEntry) => {
+        const linkedArea = linkableAreas.find((area) => area.id === zoneEntry.linkedContentId)
+        if (!linkedArea) return true
+        const dx = livePos.x - linkedArea.worldPosition[0]
+        const dz = livePos.z - linkedArea.worldPosition[2]
+        return dx * dx + dz * dz <= EDITOR_LIST_RADIUS * EDITOR_LIST_RADIUS
+      })
 
   return (
     <div
@@ -66,7 +82,9 @@ export function ClickZonePanel() {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <strong style={{ fontSize: 14 }}>Content-Hotspots ({linkedClickZones.length})</strong>
+        <strong style={{ fontSize: 14 }}>
+          Content-Hotspots ({showAll ? linkedClickZones.length : `${visibleClickZones.length}/${linkedClickZones.length}`})
+        </strong>
         <div style={{ display: 'flex', gap: 6 }}>
           <button
             onClick={() => {
@@ -125,6 +143,14 @@ export function ClickZonePanel() {
           />
           Hotspots anzeigen
         </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, opacity: 0.9 }}>
+          <input
+            type="checkbox"
+            checked={showAll}
+            onChange={(e) => setShowAll(e.target.checked)}
+          />
+          Alle anzeigen
+        </label>
       </div>
 
       {linkableAreas.length === 0 && (
@@ -135,7 +161,13 @@ export function ClickZonePanel() {
         <div style={{ opacity: 0.6 }}>Noch keine Content-Hotspots angelegt.</div>
       )}
 
-      {linkedClickZones.map((zoneEntry) => {
+      {linkedClickZones.length > 0 && visibleClickZones.length === 0 && (
+        <div style={{ opacity: 0.6 }}>
+          Keine Hotspots in der Nähe. "Alle anzeigen" aktivieren, um alle zu sehen.
+        </div>
+      )}
+
+      {visibleClickZones.map((zoneEntry) => {
         const zone = buildDefaultClickZone(zoneEntry.clickZone)
         const offset = zone.offset ?? [0, -0.06, 0]
         const size = zone.size ?? [8, 8]

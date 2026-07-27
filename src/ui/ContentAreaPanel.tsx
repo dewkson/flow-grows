@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import { useGardenStore } from '../store/gardenStore'
+import { usePolledCharacterPosition } from '../character/characterPosition'
+import { EDITOR_LIST_RADIUS } from '../world/constants'
 
 function toNumber(value: string, fallback: number): number {
   const n = Number.parseFloat(value)
@@ -21,7 +24,19 @@ export function ContentAreaPanel() {
   const updateContentText = useGardenStore((s) => s.updateContentText)
   const updateContentAreaMeta = useGardenStore((s) => s.updateContentAreaMeta)
 
-  if (!editorMode || activeEditorPanel !== 'hints') return null
+  const [showAll, setShowAll] = useState(false)
+  const isOpen = editorMode && activeEditorPanel === 'hints'
+  const livePos = usePolledCharacterPosition(isOpen && !showAll)
+
+  if (!isOpen) return null
+
+  const visibleContentAreas = showAll
+    ? contentAreas
+    : contentAreas.filter((area) => {
+        const dx = livePos.x - area.worldPosition[0]
+        const dz = livePos.z - area.worldPosition[2]
+        return dx * dx + dz * dz <= EDITOR_LIST_RADIUS * EDITOR_LIST_RADIUS
+      })
 
   return (
     <div
@@ -46,8 +61,18 @@ export function ContentAreaPanel() {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <strong style={{ fontSize: 14 }}>Hints ({contentAreas.length})</strong>
+        <strong style={{ fontSize: 14 }}>
+          Hints ({showAll ? contentAreas.length : `${visibleContentAreas.length}/${contentAreas.length}`})
+        </strong>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, opacity: 0.9 }}>
+            <input
+              type="checkbox"
+              checked={showAll}
+              onChange={(e) => setShowAll(e.target.checked)}
+            />
+            Alle anzeigen
+          </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, opacity: 0.9 }}>
             <input
               type="checkbox"
@@ -86,7 +111,13 @@ export function ContentAreaPanel() {
         </div>
       </div>
 
-      {contentAreas.map((area) => {
+      {contentAreas.length > 0 && visibleContentAreas.length === 0 && (
+        <div style={{ opacity: 0.6, marginBottom: 10 }}>
+          Keine Hints in der Nähe. "Alle anzeigen" aktivieren, um alle zu sehen.
+        </div>
+      )}
+
+      {visibleContentAreas.map((area) => {
         const worldPos = area.worldPosition
         const radius = area.interactionRadius ?? 6
         const panelConfig = area.panelConfig ?? {}

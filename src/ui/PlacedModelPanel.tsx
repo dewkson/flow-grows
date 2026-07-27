@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useGardenStore } from '../store/gardenStore'
 import { createPlacedModel } from '../data/placedModel'
 import { MODEL_CATALOG } from '../data/modelCatalog'
-import { characterPosition } from '../character/characterPosition'
+import { characterPosition, usePolledCharacterPosition } from '../character/characterPosition'
+import { EDITOR_LIST_RADIUS } from '../world/constants'
 
 export function PlacedModelPanel() {
   const editorMode = useGardenStore((s) => s.editorMode)
@@ -18,10 +19,23 @@ export function PlacedModelPanel() {
   const [selectedModelPath, setSelectedModelPath] = useState(MODEL_CATALOG[0].path)
   const [selectedScale, setSelectedScale] = useState(1)
   const [selectedPositionY, setSelectedPositionY] = useState(0)
+  const [showAll, setShowAll] = useState(false)
 
-  if (!editorMode || activeEditorPanel !== 'models') return null
+  const isOpen = editorMode && activeEditorPanel === 'models'
+  const livePos = usePolledCharacterPosition(isOpen && !showAll)
+
+  if (!isOpen) return null
 
   const selected = placedModels.find((m) => m.id === selectedId)
+
+  const visiblePlacedModels = showAll
+    ? placedModels
+    : placedModels.filter((m) => {
+        if (m.id === selectedId) return true
+        const dx = livePos.x - m.position[0]
+        const dz = livePos.z - m.position[1]
+        return dx * dx + dz * dz <= EDITOR_LIST_RADIUS * EDITOR_LIST_RADIUS
+      })
 
   const handlePlace = () => {
     const x = Math.round(characterPosition.x * 10) / 10
@@ -53,7 +67,9 @@ export function PlacedModelPanel() {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <strong style={{ fontSize: 14 }}>Modelle ({placedModels.length})</strong>
+        <strong style={{ fontSize: 14 }}>
+          Modelle ({showAll ? placedModels.length : `${visiblePlacedModels.length}/${placedModels.length}`})
+        </strong>
         <button onClick={() => setActiveEditorPanel('none')} style={closeButtonStyle}>
           Schließen
         </button>
@@ -99,11 +115,26 @@ export function PlacedModelPanel() {
         />
       </label>
 
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, opacity: 0.9, marginBottom: 12 }}>
+        <input
+          type="checkbox"
+          checked={showAll}
+          onChange={(e) => setShowAll(e.target.checked)}
+        />
+        Alle anzeigen (statt nur Umgebung)
+      </label>
+
       {placedModels.length === 0 && (
         <div style={{ opacity: 0.5, fontSize: 12 }}>Noch keine Modelle platziert.</div>
       )}
 
-      {placedModels.map((m) => {
+      {placedModels.length > 0 && visiblePlacedModels.length === 0 && (
+        <div style={{ opacity: 0.5, fontSize: 12 }}>
+          Keine Modelle in der Nähe. "Alle anzeigen" aktivieren, um alle zu sehen.
+        </div>
+      )}
+
+      {visiblePlacedModels.map((m) => {
         const catalogEntry = MODEL_CATALOG.find((c) => c.path === m.modelPath)
         return (
           <div
