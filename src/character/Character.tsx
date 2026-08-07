@@ -115,6 +115,9 @@ export function Character() {
         map: source.map ?? null,
         color: source.map ? undefined : source.color,
         gradientMap: toonGradientMap,
+        transparent: source.transparent,
+        opacity: source.opacity,
+        side: source.side,
       })
     }
     scene.traverse(obj => {
