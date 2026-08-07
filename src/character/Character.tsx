@@ -1,4 +1,5 @@
 import { useGLTF, useAnimations } from '@react-three/drei'
+import { Select } from '@react-three/postprocessing'
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -7,6 +8,21 @@ import { characterMotion } from './characterMotion'
 import { resolveCollisions, computeAvoidanceSteer } from './collision'
 import { CHARACTER_BOUND } from '../world/constants'
 import { useGardenStore, type MotionThresholds } from '../store/gardenStore'
+
+/** Comic/cel-shading look toggle – flip to A/B compare against the PBR default. */
+const TOON_SHADING_ENABLED = true
+
+/** 3-step toon gradient map for hard cel-shading edges (module-level, per CLAUDE.md convention) */
+const TOON_GRADIENT_STEPS = 3
+const toonGradientMap = (() => {
+  const data = new Uint8Array(TOON_GRADIENT_STEPS)
+  for (let i = 0; i < TOON_GRADIENT_STEPS; i++) data[i] = (255 * i) / (TOON_GRADIENT_STEPS - 1)
+  const texture = new THREE.DataTexture(data, TOON_GRADIENT_STEPS, 1, THREE.RedFormat)
+  texture.magFilter = THREE.NearestFilter
+  texture.minFilter = THREE.NearestFilter
+  texture.needsUpdate = true
+  return texture
+})()
 
 /** Initial camera XZ offset – must match the value in App.tsx */
 const INITIAL_CAM_X = 5
@@ -85,6 +101,28 @@ export function Character() {
   useEffect(() => {
     scene.traverse(obj => {
       if ((obj as THREE.Mesh).isMesh) obj.castShadow = true
+    })
+  }, [scene])
+
+  // Swap PBR materials for a cel-shaded look. Only the `material` field changes –
+  // geometry, skin indices/weights and the skeleton are untouched, so Walk/Run/Idle
+  // keep deforming normally.
+  useEffect(() => {
+    if (!TOON_SHADING_ENABLED) return
+    const toToonMaterial = (material: THREE.Material) => {
+      const source = material as THREE.MeshStandardMaterial
+      return new THREE.MeshToonMaterial({
+        map: source.map ?? null,
+        color: source.map ? undefined : source.color,
+        gradientMap: toonGradientMap,
+      })
+    }
+    scene.traverse(obj => {
+      const mesh = obj as THREE.Mesh
+      if (!mesh.isMesh) return
+      mesh.material = Array.isArray(mesh.material)
+        ? mesh.material.map(toToonMaterial)
+        : toToonMaterial(mesh.material)
     })
   }, [scene])
 
@@ -230,8 +268,10 @@ export function Character() {
   })
 
   return (
-    <group ref={groupRef} scale={2}>
-      <primitive object={scene} />
-    </group>
+    <Select enabled={TOON_SHADING_ENABLED}>
+      <group ref={groupRef} scale={2}>
+        <primitive object={scene} />
+      </group>
+    </Select>
   )
 }
