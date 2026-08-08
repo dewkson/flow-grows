@@ -1,8 +1,10 @@
 import { OrbitControls } from '@react-three/drei'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { characterPosition } from '../character/characterPosition'
+import { useGardenStore } from '../store/gardenStore'
+import { ISO_POLAR_ANGLE } from '../world/constants'
 
 /** Look-at height above the frozen character, roughly eye level (matches CameraFocus). */
 const FOCUS_Y_OFFSET = 3
@@ -14,7 +16,14 @@ const FOCUS_Y_OFFSET = 3
  * down while this is mounted.
  */
 export function FreeCameraController() {
-  const { camera } = useThree()
+  const { gl } = useThree()
+  const cameraLockedRef = useRef(false)
+
+  useEffect(() => {
+    return useGardenStore.subscribe((state) => {
+      cameraLockedRef.current = state.cameraLocked
+    })
+  }, [])
 
   // Fixed for the lifetime of this mount: the character is frozen while free-cam is active
   const target = useMemo(
@@ -22,18 +31,27 @@ export function FreeCameraController() {
     [],
   )
 
-  // Lock the vertical viewing angle to whatever it was on entry, so dragging can only
-  // rotate around the height (Y) axis — the camera never tilts up/down or changes height.
-  const polarAngle = useMemo(() => {
-    const offset = new THREE.Vector3().subVectors(camera.position, target)
-    return new THREE.Spherical().setFromVector3(offset).phi
-  }, [camera, target])
+  // Ctrl+left-drag (or the persistent "Kamera sperren" toggle) should keep the camera
+  // fixed instead of orbiting — swallow the pointerdown in the capture phase so
+  // OrbitControls' own (bubble-phase) listener on the same element never sees it and
+  // never starts a rotate/pan drag (the default three.js behavior would otherwise turn
+  // Ctrl+left-drag into a pan, which isn't what we want here).
+  useEffect(() => {
+    const dom = gl.domElement
+    const blockLockedDrag = (e: PointerEvent) => {
+      if (e.button === 0 && (e.ctrlKey || cameraLockedRef.current)) {
+        e.stopImmediatePropagation()
+      }
+    }
+    dom.addEventListener('pointerdown', blockLockedDrag, { capture: true })
+    return () => dom.removeEventListener('pointerdown', blockLockedDrag, { capture: true })
+  }, [gl])
 
   return (
     <OrbitControls
       target={target}
-      minPolarAngle={polarAngle}
-      maxPolarAngle={polarAngle}
+      minPolarAngle={ISO_POLAR_ANGLE}
+      maxPolarAngle={ISO_POLAR_ANGLE}
       screenSpacePanning={false}
       enableDamping
       dampingFactor={0.15}

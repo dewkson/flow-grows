@@ -46,6 +46,13 @@ export const ISO_CAMERA_QUATERNION = new THREE.Quaternion().setFromRotationMatri
   new THREE.Matrix4().lookAt(ISO_CAMERA_POSITION, new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1, 0)),
 )
 
+/** Fixed polar angle (tilt from vertical) of the isometric view, derived from
+ * ISO_CAMERA_POSITION looking at the origin. Free-camera mode locks OrbitControls'
+ * min/maxPolarAngle to this constant (rather than deriving it per-entry from whatever the
+ * live camera/target pose happens to be) so the downward-looking slope always matches the
+ * rest of the app exactly, regardless of the orbit target's height. */
+export const ISO_POLAR_ANGLE = new THREE.Spherical().setFromVector3(ISO_CAMERA_POSITION).phi
+
 /** Seconds of near-zero progress toward the follow target before the character freezes
  * in place instead of endlessly pressing/sliding against whatever is blocking it. */
 export const STUCK_DEBOUNCE_TIME = 0.12

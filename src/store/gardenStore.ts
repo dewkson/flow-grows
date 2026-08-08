@@ -371,6 +371,7 @@ type GardenStoreState = {
   activeEditorPanel: 'none' | 'colliders' | 'clickzones' | 'hints' | 'motion' | 'models'
   editorMode: boolean
   freeCameraMode: boolean
+  cameraLocked: boolean
   isEditingText: boolean
   isEmbedOpen: boolean
   activeEmbedContentId: string | null
@@ -403,6 +404,7 @@ type GardenStoreState = {
   setActiveEditorPanel: (panel: 'none' | 'colliders' | 'clickzones' | 'hints' | 'motion' | 'models') => void
   toggleEditorMode: () => void
   toggleFreeCameraMode: () => void
+  toggleCameraLocked: () => void
   setIsEditingText: (editing: boolean) => void
   updateContentAreaMeta: (id: string, patch: Partial<Pick<ContentArea, 'title' | 'worldPosition' | 'interactionRadius' | 'panelConfig'>>) => void
   updateContentText: (id: string, description: string) => void
@@ -446,6 +448,7 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
   activeEditorPanel: 'none',
   editorMode: false,
   freeCameraMode: false,
+  cameraLocked: false,
   isEditingText: false,
   isEmbedOpen: false,
   activeEmbedContentId: null,
@@ -510,9 +513,11 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
         editorMode: nextEditorMode,
         activeEditorPanel: nextEditorMode ? state.activeEditorPanel : 'none',
         freeCameraMode: nextEditorMode ? state.freeCameraMode : false,
+        cameraLocked: nextEditorMode ? state.cameraLocked : false,
       }
     }),
   toggleFreeCameraMode: () => set((state) => ({ freeCameraMode: !state.freeCameraMode })),
+  toggleCameraLocked: () => set((state) => ({ cameraLocked: !state.cameraLocked })),
   setIsEditingText: (editing) => set({ isEditingText: editing }),
   updateContentAreaMeta: (id, patch) =>
     set((state) => {

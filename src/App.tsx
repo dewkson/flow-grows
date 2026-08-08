@@ -11,6 +11,7 @@ import { ContentAreaPanel } from './ui/ContentAreaPanel'
 import { GardenSwitcher } from './ui/GardenSwitcher'
 import { MotionPanel } from './ui/MotionPanel'
 import { FreeCameraToggle } from './ui/FreeCameraToggle'
+import { CameraLockToggle } from './ui/CameraLockToggle'
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
       </Canvas>
       <ModeToggle />
       <FreeCameraToggle />
+      <CameraLockToggle />
       <EditorMenu />
       <ColliderPanel />
       <PlacedModelPanel />
