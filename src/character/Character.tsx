@@ -6,7 +6,12 @@ import * as THREE from 'three'
 import { characterPosition } from './characterPosition'
 import { characterMotion } from './characterMotion'
 import { resolveCollisions, computeAvoidanceSteer } from './collision'
-import { CHARACTER_BOUND } from '../world/constants'
+import {
+  CHARACTER_BOUND,
+  STUCK_DEBOUNCE_TIME,
+  STUCK_PROGRESS_RATE_THRESHOLD,
+  STUCK_DIRECTION_CHANGE_ANGLE,
+} from '../world/constants'
 import { useGardenStore, type MotionThresholds } from '../store/gardenStore'
 
 /** Comic/cel-shading look toggle – flip to A/B compare against the PBR default. */
@@ -77,6 +82,11 @@ export function Character() {
   const motionStateRef = useRef<MotionState>('idle')
   const speedRef = useRef(0)
   const followStateRef = useRef<'resting' | 'following'>('resting')
+  // Frozen while true: the character stopped making real progress toward the follow
+  // target (blocked by a collider) and won't try again until the desired direction changes.
+  const blockedRef = useRef(false)
+  const stallTimeRef = useRef(0)
+  const blockedDirRef = useRef({ x: 0, z: 0 })
 
   const { scene, animations } = useGLTF('/models/Character/character.glb')
   // Bind the mixer directly to the scene so bone track names resolve correctly
@@ -140,8 +150,9 @@ export function Character() {
   useFrame((_, delta) => {
     if (!groupRef.current) return
 
-    // Freeze movement when embed panel is open
-    if (useGardenStore.getState().isEmbedOpen) {
+    // Freeze movement when embed panel is open, or while the editor's free-camera
+    // mode is active (camera orbits independently, character stays put)
+    if (useGardenStore.getState().isEmbedOpen || useGardenStore.getState().freeCameraMode) {
       characterPosition.copy(groupRef.current.position)
       return
     }
@@ -177,15 +188,38 @@ export function Character() {
       targetZ - groupRef.current.position.z,
     )
     if (followStateRef.current === 'resting') {
-      if (targetDistance > followDeadzone) followStateRef.current = 'following'
+      if (targetDistance > followDeadzone) {
+        followStateRef.current = 'following'
+        blockedRef.current = false
+        stallTimeRef.current = 0
+      }
     } else if (targetDistance < followCatchUp) {
       followStateRef.current = 'resting'
+      blockedRef.current = false
+      stallTimeRef.current = 0
+    }
+
+    // While frozen, only resume once the desired travel direction has swung far enough
+    // away from the one that got the character stuck (e.g. the user drags the camera
+    // somewhere new) – re-testing the same direction every frame would just re-trigger
+    // the same collision/stall over and over.
+    if (followStateRef.current === 'following' && blockedRef.current) {
+      const dirLen = Math.hypot(targetX - groupRef.current.position.x, targetZ - groupRef.current.position.z)
+      if (dirLen > 1e-6) {
+        const dirX = (targetX - groupRef.current.position.x) / dirLen
+        const dirZ = (targetZ - groupRef.current.position.z) / dirLen
+        const cosAngle = dirX * blockedDirRef.current.x + dirZ * blockedDirRef.current.z
+        if (cosAngle < Math.cos(STUCK_DIRECTION_CHANGE_ANGLE)) {
+          blockedRef.current = false
+          stallTimeRef.current = 0
+        }
+      }
     }
 
     // Lerp only X and Z – Y (height above ground) stays constant
     let stepX = 0
     let stepZ = 0
-    if (followStateRef.current === 'following') {
+    if (followStateRef.current === 'following' && !blockedRef.current) {
       stepX = (targetX - groupRef.current.position.x) * lerpSpeed
       stepZ = (targetZ - groupRef.current.position.z) * lerpSpeed
     }
@@ -195,7 +229,7 @@ export function Character() {
     // them (plain push-out collision alone can pin the character at a flat wall approached
     // head-on, since the target sits directly behind it).
     const colliders = useGardenStore.getState().colliders
-    if (followStateRef.current === 'following') {
+    if (followStateRef.current === 'following' && !blockedRef.current) {
       const [avoidX, avoidZ] = computeAvoidanceSteer(
         groupRef.current.position.x,
         groupRef.current.position.z,
@@ -228,6 +262,30 @@ export function Character() {
     )
     groupRef.current.position.x = resolvedX
     groupRef.current.position.z = resolvedZ
+
+    // Stuck detection: if the character isn't actually closing distance to the target
+    // (whether pinned dead still or just sliding/curving along a collider without real
+    // progress), accumulate stall time and freeze in place once it's sustained – rather
+    // than endlessly pressing/sliding against the obstacle every frame.
+    if (followStateRef.current === 'following' && !blockedRef.current) {
+      const distBefore = Math.hypot(targetX - currentX, targetZ - currentZ)
+      const distAfter = Math.hypot(targetX - resolvedX, targetZ - resolvedZ)
+      const progressRate = delta > 0 ? (distBefore - distAfter) / delta : 0
+      if (progressRate < STUCK_PROGRESS_RATE_THRESHOLD) {
+        stallTimeRef.current += delta
+        if (stallTimeRef.current >= STUCK_DEBOUNCE_TIME) {
+          blockedRef.current = true
+          stallTimeRef.current = 0
+          const dirLen = Math.hypot(targetX - resolvedX, targetZ - resolvedZ)
+          blockedDirRef.current =
+            dirLen > 1e-6
+              ? { x: (targetX - resolvedX) / dirLen, z: (targetZ - resolvedZ) / dirLen }
+              : { x: 0, z: 0 }
+        }
+      } else {
+        stallTimeRef.current = 0
+      }
+    }
 
     // Actual distance covered this frame (post camera-lerp + collision resolution) –
     // used for both facing and animation speed, so visuals match real motion

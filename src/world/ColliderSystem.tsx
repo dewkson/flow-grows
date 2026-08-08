@@ -27,6 +27,7 @@ function worldToLocalOffset(rot: number, wx: number, wz: number): [number, numbe
 /** Single collider box/cylinder + resize/rotate handles when selected in editor mode */
 function ColliderBox({ data }: { data: Collider }) {
   const editorMode = useGardenStore((s) => s.editorMode)
+  const activeEditorPanel = useGardenStore((s) => s.activeEditorPanel)
   const selectedId = useGardenStore((s) => s.selectedColliderId)
   const selectCollider = useGardenStore((s) => s.selectCollider)
   const updateCollider = useGardenStore((s) => s.updateCollider)
@@ -34,7 +35,9 @@ function ColliderBox({ data }: { data: Collider }) {
   const removeCollider = useGardenStore((s) => s.removeCollider)
   const setCameraDragLocked = useGardenStore((s) => s.setCameraDragLocked)
 
-  const isSelected = selectedId === data.id
+  // Grabbing/manipulating a collider requires the Collider tab to be active in the editor menu.
+  const canInteract = editorMode && activeEditorPanel === 'colliders'
+  const isSelected = canInteract && selectedId === data.id
   const visible = editorMode
   const isBox = data.shape !== 'cylinder'
 
@@ -57,7 +60,7 @@ function ColliderBox({ data }: { data: Collider }) {
   const onPointerDown = useCallback(
     (handle: DragHandle) =>
       (e: ThreeEvent<PointerEvent>) => {
-        if (!editorMode) return
+        if (!canInteract) return
         e.stopPropagation()
         selectCollider(data.id)
         setColliderUndoSnapshot(data.id)
@@ -77,7 +80,7 @@ function ColliderBox({ data }: { data: Collider }) {
         const target = e.target as (EventTarget & { setPointerCapture?: (id: number) => void }) | null
         target?.setPointerCapture?.(e.pointerId)
       },
-    [editorMode, data.id, data.position, data.size, data.radius, selectCollider, setColliderUndoSnapshot, setCameraDragLocked],
+    [canInteract, data.id, data.position, data.size, data.radius, selectCollider, setColliderUndoSnapshot, setCameraDragLocked],
   )
 
   const onPointerMove = useCallback(
@@ -174,7 +177,7 @@ function ColliderBox({ data }: { data: Collider }) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onClick={(e) => {
-          if (!editorMode) return
+          if (!canInteract) return
           e.stopPropagation()
           selectCollider(data.id)
         }}
@@ -193,8 +196,8 @@ function ColliderBox({ data }: { data: Collider }) {
         <lineBasicMaterial color={isSelected ? '#ff2222' : '#ff6600'} />
       </lineSegments>
 
-      {/* Resize/rotate handles (editor only, selected only) */}
-      {editorMode && isSelected && (
+      {/* Resize/rotate handles (Collider tab active + selected only) */}
+      {canInteract && isSelected && (
         <>
           {isBox ? (
             <>

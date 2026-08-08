@@ -31,6 +31,10 @@ function PlacedModelInstance({
   const selectPlacedModel = useGardenStore((s) => s.selectPlacedModel)
   const updatePlacedModel = useGardenStore((s) => s.updatePlacedModel)
   const setCameraDragLocked = useGardenStore((s) => s.setCameraDragLocked)
+  const activeEditorPanel = useGardenStore((s) => s.activeEditorPanel)
+
+  // Grabbing/moving a model requires the Modelle tab to be active in the editor menu.
+  const canInteract = editorMode && activeEditorPanel === 'models'
 
   const { scene } = useGLTF(modelPath)
 
@@ -91,7 +95,7 @@ function PlacedModelInstance({
 
   const onPointerDown = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
-      if (!editorMode) return
+      if (!canInteract) return
       e.stopPropagation()
       selectPlacedModel(id)
       setCameraDragLocked(true)
@@ -104,7 +108,7 @@ function PlacedModelInstance({
       const target = e.target as (EventTarget & { setPointerCapture?: (id: number) => void }) | null
       target?.setPointerCapture?.(e.pointerId)
     },
-    [editorMode, id, position, selectPlacedModel, setCameraDragLocked],
+    [canInteract, id, position, selectPlacedModel, setCameraDragLocked],
   )
 
   const onPointerMove = useCallback(
@@ -149,6 +153,7 @@ function PlacedModelInstance({
             onPointerUp={onPointerUp}
             onClick={(e) => {
               e.stopPropagation()
+              if (!canInteract) return
               selectPlacedModel(id)
             }}
           >
@@ -178,6 +183,7 @@ function PlacedModelInstance({
 export function PlacedModels() {
   const placedModels = useGardenStore((s) => s.placedModels)
   const editorMode = useGardenStore((s) => s.editorMode)
+  const activeEditorPanel = useGardenStore((s) => s.activeEditorPanel)
   const selectedId = useGardenStore((s) => s.selectedPlacedModelId)
 
   return (
@@ -191,7 +197,7 @@ export function PlacedModels() {
           positionY={m.positionY}
           rotationY={m.rotationY}
           scale={m.scale}
-          isSelected={editorMode && selectedId === m.id}
+          isSelected={editorMode && activeEditorPanel === 'models' && selectedId === m.id}
           editorMode={editorMode}
         />
       ))}

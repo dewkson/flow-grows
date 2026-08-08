@@ -1,9 +1,10 @@
+import * as THREE from 'three'
+
 /** Size of the ground plane (square) */
 export const GROUND_SIZE = 200
 
 /** Half the ground size – used for boundary clamping */
 export const HALF_GROUND = GROUND_SIZE / 2
-
 /** Height of the boundary walls */
 export const WALL_HEIGHT = 2
 
@@ -32,3 +33,28 @@ export const OBSTACLE_AVOIDANCE_MARGIN = 3
 /** How strongly the avoidance nudge deflects movement, as a multiple of the character's
  * per-frame max-speed step. */
 export const OBSTACLE_AVOIDANCE_STRENGTH = 1.4
+
+/** Initial isometric camera position (must match the `camera` prop passed to <Canvas> in App.tsx). */
+export const ISO_CAMERA_POSITION = new THREE.Vector3(5, 5 / Math.sqrt(2), 5)
+
+/** Fixed camera orientation for the isometric view (Play mode and normal Editor mode):
+ * looking at the world origin from ISO_CAMERA_POSITION. Dragging the camera only ever
+ * translates its position, never its rotation – free-camera mode is the only thing that
+ * rotates the camera, and always returns to this exact orientation afterwards, so the
+ * isometric tilt stays constant everywhere else. */
+export const ISO_CAMERA_QUATERNION = new THREE.Quaternion().setFromRotationMatrix(
+  new THREE.Matrix4().lookAt(ISO_CAMERA_POSITION, new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1, 0)),
+)
+
+/** Seconds of near-zero progress toward the follow target before the character freezes
+ * in place instead of endlessly pressing/sliding against whatever is blocking it. */
+export const STUCK_DEBOUNCE_TIME = 0.12
+
+/** Progress rate (world units/sec of closing distance to the target) below which
+ * movement counts as "stalled" for stuck detection – catches both a hard wall press
+ * and sliding along a collider that never actually closes the distance to the target. */
+export const STUCK_PROGRESS_RATE_THRESHOLD = 0.4
+
+/** Angle (radians) the desired travel direction must change by, compared to the
+ * direction recorded when the character froze, before it resumes trying to move. */
+export const STUCK_DIRECTION_CHANGE_ANGLE = (25 * Math.PI) / 180

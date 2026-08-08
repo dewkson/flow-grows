@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { CAM_OFFSET, HALF_GROUND, WALL_THICKNESS } from '../world/constants'
+import { CAM_OFFSET, HALF_GROUND, ISO_CAMERA_QUATERNION, WALL_THICKNESS } from '../world/constants'
 import { useGardenStore } from '../store/gardenStore'
 
 export function CameraController() {
@@ -12,6 +12,10 @@ export function CameraController() {
   const cameraDragLockedRef = useRef(false)
 
   const isEmbedOpenRef = useRef(false)
+  const freeCameraModeRef = useRef(false)
+  const wasFreeCameraRef = useRef(false)
+  const returningRef = useRef(false)
+  const savedPoseRef = useRef<{ position: THREE.Vector3; zoom: number } | null>(null)
 
   // Keep refs in sync with the store so event handlers see the latest value
   useEffect(() => {
@@ -20,6 +24,7 @@ export function CameraController() {
         isEditingTextRef.current = state.isEditingText
         isEmbedOpenRef.current = state.isEmbedOpen
         cameraDragLockedRef.current = state.cameraDragLocked
+        freeCameraModeRef.current = state.freeCameraMode
       },
     )
   }, [])
@@ -36,13 +41,13 @@ export function CameraController() {
     const handleMouseDown = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null
       if (target?.closest('[data-no-camera-drag="true"]')) return
-      if (cameraDragLockedRef.current || isEditingTextRef.current || isEmbedOpenRef.current) return
+      if (cameraDragLockedRef.current || isEditingTextRef.current || isEmbedOpenRef.current || freeCameraModeRef.current) return
       isDragging.current = true
       previousMousePosition.current = { x: e.clientX, y: e.clientY }
     }
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (cameraDragLockedRef.current) {
+      if (cameraDragLockedRef.current || freeCameraModeRef.current) {
         isDragging.current = false
         return
       }
@@ -91,6 +96,47 @@ export function CameraController() {
   const RETURN_SPEED = 0.12
 
   useFrame(() => {
+    // While free-camera mode (OrbitControls) is active, it owns the camera exclusively —
+    // just remember the pose we had right before entering, to lerp back to on exit.
+    if (freeCameraModeRef.current) {
+      if (!wasFreeCameraRef.current) {
+        savedPoseRef.current = {
+          position: camera.position.clone(),
+          zoom: (camera as THREE.OrthographicCamera).zoom,
+        }
+      }
+      wasFreeCameraRef.current = true
+      return
+    }
+
+    if (wasFreeCameraRef.current) {
+      wasFreeCameraRef.current = false
+      returningRef.current = true
+    }
+
+    if (returningRef.current && savedPoseRef.current) {
+      const saved = savedPoseRef.current
+      const orthoCam = camera as THREE.OrthographicCamera
+      camera.position.lerp(saved.position, RETURN_SPEED)
+      camera.quaternion.slerp(ISO_CAMERA_QUATERNION, RETURN_SPEED)
+      orthoCam.zoom += (saved.zoom - orthoCam.zoom) * RETURN_SPEED // eslint-disable-line react-hooks/immutability
+      orthoCam.updateProjectionMatrix()
+
+      const doneRotating = camera.quaternion.angleTo(ISO_CAMERA_QUATERNION) < 0.001
+      if (camera.position.distanceTo(saved.position) < 0.01 && Math.abs(orthoCam.zoom - saved.zoom) < 0.01 && doneRotating) {
+        camera.position.copy(saved.position)
+        camera.quaternion.copy(ISO_CAMERA_QUATERNION)
+        orthoCam.zoom = saved.zoom
+        orthoCam.updateProjectionMatrix()
+        returningRef.current = false
+        savedPoseRef.current = null
+      }
+      return
+    }
+
+    // Guard against any drift: outside of free-camera mode, the isometric tilt is fixed.
+    camera.quaternion.copy(ISO_CAMERA_QUATERNION)
+
     const targetX =
       THREE.MathUtils.clamp(
         camera.position.x - CAM_OFFSET,

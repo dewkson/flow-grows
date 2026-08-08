@@ -14,8 +14,12 @@ export function CameraFocus() {
 
   const activeContentId = useGardenStore((s) => s.activeContentId)
   const contentAreas = useGardenStore((s) => s.contentAreas)
+  const freeCameraMode = useGardenStore((s) => s.freeCameraMode)
 
   useFrame(() => {
+    // Free-camera mode (OrbitControls) owns the camera exclusively while active
+    if (freeCameraMode) return
+
     const isActive = activeContentId !== null
 
     // Just became active — save camera position
