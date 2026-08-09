@@ -160,3 +160,38 @@ export function computeAvoidanceSteer(
   return [avoidX * desiredLen * OBSTACLE_AVOIDANCE_STRENGTH, avoidZ * desiredLen * OBSTACLE_AVOIDANCE_STRENGTH]
 }
 
+/** Structural shape shared by Collider and TriggerZone – lets both use the same point test. */
+export type ShapeLike = {
+  position: [number, number]
+  size: [number, number]
+  radius: number
+  rotationY: number
+  shape: 'box' | 'cylinder'
+}
+
+/**
+ * Point-in-shape test (no collision resolution) used by non-solid trigger zones to detect
+ * enter/exit. Box uses the same world->local rotation trick as resolveCollisions; cylinder
+ * is plain circle containment.
+ */
+export function isPointInsideShape(x: number, z: number, target: ShapeLike): boolean {
+  const [bx, bz] = target.position
+
+  if (target.shape === 'cylinder') {
+    const dx = x - bx
+    const dz = z - bz
+    return dx * dx + dz * dz <= target.radius * target.radius
+  }
+
+  const [hw, hd] = [target.size[0] / 2, target.size[1] / 2]
+  const rot = target.rotationY ?? 0
+  const cos = Math.cos(rot)
+  const sin = Math.sin(rot)
+  const relX = x - bx
+  const relZ = z - bz
+  const lx = relX * cos - relZ * sin
+  const lz = relX * sin + relZ * cos
+
+  return Math.abs(lx) <= hw && Math.abs(lz) <= hd
+}
+

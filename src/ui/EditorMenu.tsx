@@ -7,7 +7,7 @@ export function EditorMenu() {
 
   if (!editorMode) return null
 
-  const togglePanel = (panel: 'colliders' | 'clickzones' | 'hints' | 'motion' | 'models') => {
+  const togglePanel = (panel: 'colliders' | 'triggers' | 'clickzones' | 'hints' | 'motion' | 'models' | 'camera') => {
     setActiveEditorPanel(activeEditorPanel === panel ? 'none' : panel)
   }
 
@@ -32,6 +32,17 @@ export function EditorMenu() {
         title="Collider-Editor öffnen"
       >
         Collider
+      </button>
+
+      <button
+        onClick={() => togglePanel('triggers')}
+        style={{
+          ...buttonStyle,
+          background: activeEditorPanel === 'triggers' ? 'rgba(99, 102, 241, 0.95)' : 'rgba(51, 65, 85, 0.92)',
+        }}
+        title="Trigger-Editor öffnen"
+      >
+        Trigger
       </button>
 
       <button
@@ -76,6 +87,17 @@ export function EditorMenu() {
         title="Modelle platzieren"
       >
         Modelle
+      </button>
+
+      <button
+        onClick={() => togglePanel('camera')}
+        style={{
+          ...buttonStyle,
+          background: activeEditorPanel === 'camera' ? 'rgba(236, 72, 153, 0.95)' : 'rgba(51, 65, 85, 0.92)',
+        }}
+        title="Kamera-Einstellungen"
+      >
+        Kamera
       </button>
     </div>
   )

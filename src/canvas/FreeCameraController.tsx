@@ -1,10 +1,10 @@
 import { OrbitControls } from '@react-three/drei'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { characterPosition } from '../character/characterPosition'
 import { useGardenStore } from '../store/gardenStore'
-import { ISO_POLAR_ANGLE } from '../world/constants'
+import { getIsoPolarAngleRad } from '../world/constants'
 
 /** Look-at height above the frozen character, roughly eye level (matches CameraFocus). */
 const FOCUS_Y_OFFSET = 3
@@ -17,13 +17,9 @@ const FOCUS_Y_OFFSET = 3
  */
 export function FreeCameraController() {
   const { gl } = useThree()
-  const cameraLockedRef = useRef(false)
-
-  useEffect(() => {
-    return useGardenStore.subscribe((state) => {
-      cameraLockedRef.current = state.cameraLocked
-    })
-  }, [])
+  const cameraLocked = useGardenStore((s) => s.cameraLocked)
+  const cameraTiltDeg = useGardenStore((s) => s.cameraTiltDeg)
+  const polarAngle = useMemo(() => getIsoPolarAngleRad(cameraTiltDeg), [cameraTiltDeg])
 
   // Fixed for the lifetime of this mount: the character is frozen while free-cam is active
   const target = useMemo(
@@ -31,28 +27,30 @@ export function FreeCameraController() {
     [],
   )
 
-  // Ctrl+left-drag (or the persistent "Kamera sperren" toggle) should keep the camera
-  // fixed instead of orbiting — swallow the pointerdown in the capture phase so
-  // OrbitControls' own (bubble-phase) listener on the same element never sees it and
-  // never starts a rotate/pan drag (the default three.js behavior would otherwise turn
-  // Ctrl+left-drag into a pan, which isn't what we want here).
+  // Ctrl+left-drag should keep the camera fixed instead of orbiting — swallow the
+  // pointerdown in the capture phase so OrbitControls' own (bubble-phase) listener on
+  // the same element never sees it (the default three.js behavior would otherwise turn
+  // Ctrl+left-drag into a pan, which isn't what we want here). The persistent "Kamera
+  // sperren" toggle is handled separately via enableRotate below, NOT via this DOM block,
+  // so it doesn't also swallow clicks meant for collider/model manipulators.
   useEffect(() => {
     const dom = gl.domElement
-    const blockLockedDrag = (e: PointerEvent) => {
-      if (e.button === 0 && (e.ctrlKey || cameraLockedRef.current)) {
+    const blockCtrlDrag = (e: PointerEvent) => {
+      if (e.button === 0 && e.ctrlKey) {
         e.stopImmediatePropagation()
       }
     }
-    dom.addEventListener('pointerdown', blockLockedDrag, { capture: true })
-    return () => dom.removeEventListener('pointerdown', blockLockedDrag, { capture: true })
+    dom.addEventListener('pointerdown', blockCtrlDrag, { capture: true })
+    return () => dom.removeEventListener('pointerdown', blockCtrlDrag, { capture: true })
   }, [gl])
 
   return (
     <OrbitControls
       target={target}
-      minPolarAngle={ISO_POLAR_ANGLE}
-      maxPolarAngle={ISO_POLAR_ANGLE}
+      minPolarAngle={polarAngle}
+      maxPolarAngle={polarAngle}
       screenSpacePanning={false}
+      enableRotate={!cameraLocked}
       enableDamping
       dampingFactor={0.15}
     />

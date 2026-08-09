@@ -34,24 +34,45 @@ export const OBSTACLE_AVOIDANCE_MARGIN = 3
  * per-frame max-speed step. */
 export const OBSTACLE_AVOIDANCE_STRENGTH = 1.4
 
-/** Initial isometric camera position (must match the `camera` prop passed to <Canvas> in App.tsx). */
-export const ISO_CAMERA_POSITION = new THREE.Vector3(5, 5 / Math.sqrt(2), 5)
+/** Isometric camera tilt (downward angle from horizontal, in degrees) matching the
+ * original hardcoded ISO_CAMERA_POSITION of (CAM_OFFSET, CAM_OFFSET/√2, CAM_OFFSET),
+ * so the default view is unchanged for existing users. User-adjustable via the
+ * editor's camera panel (gardenStore `cameraTiltDeg`), persisted in localStorage.
+ * tan(tilt) = y / horizontalRadius = (CAM_OFFSET/√2) / (CAM_OFFSET*√2) = 1/2. */
+export const DEFAULT_CAMERA_TILT_DEG = (Math.atan(0.5) * 180) / Math.PI
 
-/** Fixed camera orientation for the isometric view (Play mode and normal Editor mode):
- * looking at the world origin from ISO_CAMERA_POSITION. Dragging the camera only ever
- * translates its position, never its rotation – free-camera mode is the only thing that
- * rotates the camera, and always returns to this exact orientation afterwards, so the
- * isometric tilt stays constant everywhere else. */
-export const ISO_CAMERA_QUATERNION = new THREE.Quaternion().setFromRotationMatrix(
-  new THREE.Matrix4().lookAt(ISO_CAMERA_POSITION, new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1, 0)),
-)
+/** Isometric camera position for a given tilt angle (degrees). The horizontal offset
+ * (X/Z = CAM_OFFSET) and yaw (45°) are always fixed – only the height (and therefore the
+ * downward look angle) varies, so this never affects the character-follow/bounds math
+ * elsewhere, which only relies on the fixed CAM_OFFSET. */
+export function getIsoCameraPosition(tiltDeg: number): THREE.Vector3 {
+  const tiltRad = (tiltDeg * Math.PI) / 180
+  const horizontalRadius = CAM_OFFSET * Math.SQRT2
+  return new THREE.Vector3(CAM_OFFSET, horizontalRadius * Math.tan(tiltRad), CAM_OFFSET)
+}
 
-/** Fixed polar angle (tilt from vertical) of the isometric view, derived from
- * ISO_CAMERA_POSITION looking at the origin. Free-camera mode locks OrbitControls'
- * min/maxPolarAngle to this constant (rather than deriving it per-entry from whatever the
- * live camera/target pose happens to be) so the downward-looking slope always matches the
- * rest of the app exactly, regardless of the orbit target's height. */
-export const ISO_POLAR_ANGLE = new THREE.Spherical().setFromVector3(ISO_CAMERA_POSITION).phi
+/** Camera orientation looking at the world origin from the given position. Dragging the
+ * camera only ever translates its position, never its rotation – free-camera mode is the
+ * only thing that rotates the camera, and always returns to this exact orientation
+ * afterwards, so the isometric tilt stays constant everywhere else. */
+export function getIsoCameraQuaternion(position: THREE.Vector3): THREE.Quaternion {
+  return new THREE.Quaternion().setFromRotationMatrix(
+    new THREE.Matrix4().lookAt(position, new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1, 0)),
+  )
+}
+
+/** Polar angle (tilt from vertical, radians) for a given tilt-from-horizontal (degrees).
+ * Free-camera mode locks OrbitControls' min/maxPolarAngle to this so the downward-looking
+ * slope always matches the rest of the app exactly, regardless of the orbit target's height. */
+export function getIsoPolarAngleRad(tiltDeg: number): number {
+  return Math.PI / 2 - (tiltDeg * Math.PI) / 180
+}
+
+/** Default-tilt isometric camera position/orientation, for spots that only need the
+ * unmodified default (e.g. the initial `camera` prop passed to <Canvas> in App.tsx). */
+export const ISO_CAMERA_POSITION = getIsoCameraPosition(DEFAULT_CAMERA_TILT_DEG)
+export const ISO_CAMERA_QUATERNION = getIsoCameraQuaternion(ISO_CAMERA_POSITION)
+export const ISO_POLAR_ANGLE = getIsoPolarAngleRad(DEFAULT_CAMERA_TILT_DEG)
 
 /** Seconds of near-zero progress toward the follow target before the character freezes
  * in place instead of endlessly pressing/sliding against whatever is blocking it. */

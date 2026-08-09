@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { CAM_OFFSET, HALF_GROUND, ISO_CAMERA_QUATERNION, WALL_THICKNESS } from '../world/constants'
+import { CAM_OFFSET, HALF_GROUND, WALL_THICKNESS, getIsoCameraPosition, getIsoCameraQuaternion } from '../world/constants'
 import { useGardenStore } from '../store/gardenStore'
 
 export function CameraController() {
@@ -16,6 +16,12 @@ export function CameraController() {
   const wasFreeCameraRef = useRef(false)
   const returningRef = useRef(false)
   const savedPoseRef = useRef<{ position: THREE.Vector3; zoom: number } | null>(null)
+  const cameraZoomRef = useRef(useGardenStore.getState().cameraZoom)
+  const captureRequestedRef = useRef(false)
+
+  // Cached isometric quaternion, only recomputed when the tilt actually changes
+  const isoQuaternionRef = useRef(getIsoCameraQuaternion(getIsoCameraPosition(useGardenStore.getState().cameraTiltDeg)))
+  const cameraTiltDegRef = useRef(useGardenStore.getState().cameraTiltDeg)
 
   // Keep refs in sync with the store so event handlers see the latest value
   useEffect(() => {
@@ -25,6 +31,12 @@ export function CameraController() {
         isEmbedOpenRef.current = state.isEmbedOpen
         cameraDragLockedRef.current = state.cameraDragLocked
         freeCameraModeRef.current = state.freeCameraMode
+        cameraZoomRef.current = state.cameraZoom
+        captureRequestedRef.current = state.captureRequested
+        if (state.cameraTiltDeg !== cameraTiltDegRef.current) {
+          cameraTiltDegRef.current = state.cameraTiltDeg
+          isoQuaternionRef.current = getIsoCameraQuaternion(getIsoCameraPosition(state.cameraTiltDeg))
+        }
       },
     )
   }, [])
@@ -106,6 +118,12 @@ export function CameraController() {
         }
       }
       wasFreeCameraRef.current = true
+
+      // "Editor-Perspektive übernehmen": persist the live free-camera zoom as the new default
+      if (captureRequestedRef.current) {
+        useGardenStore.getState().setCameraZoom((camera as THREE.OrthographicCamera).zoom)
+        useGardenStore.getState().clearCaptureRequested()
+      }
       return
     }
 
@@ -117,16 +135,17 @@ export function CameraController() {
     if (returningRef.current && savedPoseRef.current) {
       const saved = savedPoseRef.current
       const orthoCam = camera as THREE.OrthographicCamera
+      const targetZoom = cameraZoomRef.current
       camera.position.lerp(saved.position, RETURN_SPEED)
-      camera.quaternion.slerp(ISO_CAMERA_QUATERNION, RETURN_SPEED)
-      orthoCam.zoom += (saved.zoom - orthoCam.zoom) * RETURN_SPEED // eslint-disable-line react-hooks/immutability
+      camera.quaternion.slerp(isoQuaternionRef.current, RETURN_SPEED)
+      orthoCam.zoom += (targetZoom - orthoCam.zoom) * RETURN_SPEED // eslint-disable-line react-hooks/immutability
       orthoCam.updateProjectionMatrix()
 
-      const doneRotating = camera.quaternion.angleTo(ISO_CAMERA_QUATERNION) < 0.001
-      if (camera.position.distanceTo(saved.position) < 0.01 && Math.abs(orthoCam.zoom - saved.zoom) < 0.01 && doneRotating) {
+      const doneRotating = camera.quaternion.angleTo(isoQuaternionRef.current) < 0.001
+      if (camera.position.distanceTo(saved.position) < 0.01 && Math.abs(orthoCam.zoom - targetZoom) < 0.01 && doneRotating) {
         camera.position.copy(saved.position)
-        camera.quaternion.copy(ISO_CAMERA_QUATERNION)
-        orthoCam.zoom = saved.zoom
+        camera.quaternion.copy(isoQuaternionRef.current)
+        orthoCam.zoom = targetZoom
         orthoCam.updateProjectionMatrix()
         returningRef.current = false
         savedPoseRef.current = null
@@ -135,7 +154,7 @@ export function CameraController() {
     }
 
     // Guard against any drift: outside of free-camera mode, the isometric tilt is fixed.
-    camera.quaternion.copy(ISO_CAMERA_QUATERNION)
+    camera.quaternion.copy(isoQuaternionRef.current)
 
     const targetX =
       THREE.MathUtils.clamp(
@@ -152,6 +171,13 @@ export function CameraController() {
 
     camera.position.x += (targetX - camera.position.x) * RETURN_SPEED // eslint-disable-line react-hooks/immutability
     camera.position.z += (targetZ - camera.position.z) * RETURN_SPEED
+
+    // Ease toward the persisted zoom (e.g. slider changes) whenever not mid free-cam transition
+    const orthoCam = camera as THREE.OrthographicCamera
+    if (Math.abs(orthoCam.zoom - cameraZoomRef.current) > 0.001) {
+      orthoCam.zoom += (cameraZoomRef.current - orthoCam.zoom) * RETURN_SPEED
+      orthoCam.updateProjectionMatrix()
+    }
   })
 
   return null

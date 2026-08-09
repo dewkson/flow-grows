@@ -7,10 +7,13 @@ import {
   type LinkedClickZone,
 } from '../data/contentArea'
 import type { Collider } from '../data/collider'
+import type { TriggerZone } from '../data/trigger'
 import type { PlacedModel } from '../data/placedModel'
+import { DEFAULT_CAMERA_TILT_DEG } from '../world/constants'
 
 const STORAGE_KEY = 'flow-grows-content'
 const COLLIDER_STORAGE_KEY = 'flow-grows-colliders'
+const TRIGGER_STORAGE_KEY = 'flow-grows-triggers'
 const PLACED_MODELS_STORAGE_KEY = 'flow-grows-placed-models'
 const EMBED_STORAGE_KEY = 'flow-grows-embeds'
 const CLICK_ZONE_STORAGE_KEY = 'flow-grows-click-zones'
@@ -25,6 +28,8 @@ const CHARACTER_LERP_SPEED_KEY = 'flow-grows-character-lerp-speed'
 const CHARACTER_MAX_SPEED_KEY = 'flow-grows-character-max-speed'
 const CHARACTER_FOLLOW_DEADZONE_KEY = 'flow-grows-character-follow-deadzone'
 const CHARACTER_FOLLOW_CATCH_UP_KEY = 'flow-grows-character-follow-catch-up'
+const CAMERA_ZOOM_KEY = 'flow-grows-camera-zoom'
+const CAMERA_TILT_KEY = 'flow-grows-camera-tilt'
 
 export type SpriteConfig = {
   url: string
@@ -44,6 +49,7 @@ export type GardenSnapshot = {
   spriteSetup: SpriteConfig[]
   contentAreas: ContentArea[]
   colliders: Collider[]
+  triggers: TriggerZone[]
   linkedClickZones: LinkedClickZone[]
   placedModels: PlacedModel[]
 }
@@ -58,6 +64,23 @@ type ColliderUndoSnapshot = {
 }
 
 type UpdateColliderOptions = {
+  recordUndo?: boolean
+}
+
+type TriggerUndoSnapshot = {
+  id: string
+  position: [number, number]
+  size: [number, number]
+  radius: number
+  rotationY: number
+  shape: TriggerZone['shape']
+  onEnterActionId: string | null
+  onExitActionId: string | null
+  cooldownSec: number
+  once: boolean
+}
+
+type UpdateTriggerOptions = {
   recordUndo?: boolean
 }
 
@@ -102,6 +125,9 @@ export const DEFAULT_CHARACTER_FOLLOW_DEADZONE = 0.2
  * drag.
  */
 export const DEFAULT_CHARACTER_FOLLOW_CATCH_UP = 0.03
+
+/** Default orthographic zoom (matches the initial `camera` prop passed to <Canvas> in App.tsx). */
+export const DEFAULT_CAMERA_ZOOM = 50
 
 /** Merge saved text overrides into the default content areas */
 function loadContentAreas(): ContentArea[] {
@@ -169,6 +195,33 @@ function loadColliders(): Collider[] {
 
 function saveColliders(colliders: Collider[]) {
   localStorage.setItem(COLLIDER_STORAGE_KEY, JSON.stringify(colliders))
+}
+
+function loadTriggers(): TriggerZone[] {
+  try {
+    const raw = localStorage.getItem(TRIGGER_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as Partial<TriggerZone>[]
+    if (!Array.isArray(parsed)) return []
+    return parsed.map((t) => ({
+      id: t.id!,
+      position: t.position!,
+      size: t.size ?? [4, 4],
+      radius: t.radius ?? (t.size ? t.size[0] / 2 : 2),
+      rotationY: t.rotationY ?? 0,
+      shape: t.shape ?? 'box',
+      onEnterActionId: t.onEnterActionId ?? null,
+      onExitActionId: t.onExitActionId ?? null,
+      cooldownSec: t.cooldownSec ?? 0.5,
+      once: t.once ?? false,
+    }))
+  } catch {
+    return []
+  }
+}
+
+function saveTriggers(triggers: TriggerZone[]) {
+  localStorage.setItem(TRIGGER_STORAGE_KEY, JSON.stringify(triggers))
 }
 
 function loadPlacedModels(): PlacedModel[] {
@@ -304,6 +357,36 @@ function saveCharacterFollowCatchUp(distance: number) {
   localStorage.setItem(CHARACTER_FOLLOW_CATCH_UP_KEY, String(distance))
 }
 
+function loadCameraZoom(): number {
+  try {
+    const raw = localStorage.getItem(CAMERA_ZOOM_KEY)
+    if (!raw) return DEFAULT_CAMERA_ZOOM
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) ? parsed : DEFAULT_CAMERA_ZOOM
+  } catch {
+    return DEFAULT_CAMERA_ZOOM
+  }
+}
+
+function saveCameraZoom(zoom: number) {
+  localStorage.setItem(CAMERA_ZOOM_KEY, String(zoom))
+}
+
+function loadCameraTiltDeg(): number {
+  try {
+    const raw = localStorage.getItem(CAMERA_TILT_KEY)
+    if (!raw) return DEFAULT_CAMERA_TILT_DEG
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) ? parsed : DEFAULT_CAMERA_TILT_DEG
+  } catch {
+    return DEFAULT_CAMERA_TILT_DEG
+  }
+}
+
+function saveCameraTiltDeg(deg: number) {
+  localStorage.setItem(CAMERA_TILT_KEY, String(deg))
+}
+
 function loadActiveGardenId(): string | null {
   return localStorage.getItem(ACTIVE_GARDEN_KEY)
 }
@@ -368,10 +451,17 @@ type GardenStoreState = {
   hintsEnabled: boolean
   showHotspotZones: boolean
   cameraDragLocked: boolean
-  activeEditorPanel: 'none' | 'colliders' | 'clickzones' | 'hints' | 'motion' | 'models'
+  activeEditorPanel: 'none' | 'colliders' | 'triggers' | 'clickzones' | 'hints' | 'motion' | 'models' | 'camera'
   editorMode: boolean
   freeCameraMode: boolean
   cameraLocked: boolean
+  cameraZoom: number
+  setCameraZoom: (zoom: number) => void
+  cameraTiltDeg: number
+  setCameraTiltDeg: (deg: number) => void
+  captureRequested: boolean
+  requestCapturePerspective: () => void
+  clearCaptureRequested: () => void
   isEditingText: boolean
   isEmbedOpen: boolean
   activeEmbedContentId: string | null
@@ -380,6 +470,10 @@ type GardenStoreState = {
   selectedColliderId: string | null
   lastColliderUndo: ColliderUndoSnapshot | null
   canUndoColliderChange: boolean
+  triggers: TriggerZone[]
+  selectedTriggerId: string | null
+  lastTriggerUndo: TriggerUndoSnapshot | null
+  canUndoTriggerChange: boolean
   placedModels: PlacedModel[]
   selectedPlacedModelId: string | null
   spriteSetup: SpriteConfig[]
@@ -401,7 +495,7 @@ type GardenStoreState = {
   toggleHintsEnabled: () => void
   toggleHotspotZones: () => void
   setCameraDragLocked: (locked: boolean) => void
-  setActiveEditorPanel: (panel: 'none' | 'colliders' | 'clickzones' | 'hints' | 'motion' | 'models') => void
+  setActiveEditorPanel: (panel: 'none' | 'colliders' | 'triggers' | 'clickzones' | 'hints' | 'motion' | 'models' | 'camera') => void
   toggleEditorMode: () => void
   toggleFreeCameraMode: () => void
   toggleCameraLocked: () => void
@@ -426,6 +520,16 @@ type GardenStoreState = {
     options?: UpdateColliderOptions,
   ) => void
   selectCollider: (id: string | null) => void
+  addTrigger: (trigger: TriggerZone) => void
+  removeTrigger: (id: string) => void
+  setTriggerUndoSnapshot: (id: string) => void
+  undoLastTriggerChange: () => void
+  updateTrigger: (
+    id: string,
+    patch: Partial<Pick<TriggerZone, 'position' | 'size' | 'radius' | 'rotationY' | 'shape' | 'onEnterActionId' | 'onExitActionId' | 'cooldownSec' | 'once'>>,
+    options?: UpdateTriggerOptions,
+  ) => void
+  selectTrigger: (id: string | null) => void
   addPlacedModel: (model: PlacedModel) => void
   removePlacedModel: (id: string) => void
   updatePlacedModel: (id: string, patch: Partial<Pick<PlacedModel, 'position' | 'positionY' | 'rotationY' | 'scale'>>) => void
@@ -449,6 +553,19 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
   editorMode: false,
   freeCameraMode: false,
   cameraLocked: false,
+  cameraZoom: loadCameraZoom(),
+  setCameraZoom: (zoom) => {
+    saveCameraZoom(zoom)
+    set({ cameraZoom: zoom })
+  },
+  cameraTiltDeg: loadCameraTiltDeg(),
+  setCameraTiltDeg: (deg) => {
+    saveCameraTiltDeg(deg)
+    set({ cameraTiltDeg: deg })
+  },
+  captureRequested: false,
+  requestCapturePerspective: () => set({ captureRequested: true }),
+  clearCaptureRequested: () => set({ captureRequested: false }),
   isEditingText: false,
   isEmbedOpen: false,
   activeEmbedContentId: null,
@@ -457,6 +574,10 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
   selectedColliderId: null,
   lastColliderUndo: null,
   canUndoColliderChange: false,
+  triggers: loadTriggers(),
+  selectedTriggerId: null,
+  lastTriggerUndo: null,
+  canUndoTriggerChange: false,
   placedModels: loadPlacedModels(),
   selectedPlacedModelId: null,
   spriteSetup: loadSpriteSetup(),
@@ -703,6 +824,107 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
       }
     }),
   selectCollider: (id) => set({ selectedColliderId: id }),
+  addTrigger: (trigger) =>
+    set((state) => {
+      const updated = [...state.triggers, trigger]
+      saveTriggers(updated)
+      return { triggers: updated, lastTriggerUndo: null, canUndoTriggerChange: false }
+    }),
+  removeTrigger: (id) =>
+    set((state) => {
+      const updated = state.triggers.filter((t) => t.id !== id)
+      const shouldResetUndo = state.lastTriggerUndo?.id === id
+      saveTriggers(updated)
+      return {
+        triggers: updated,
+        selectedTriggerId: state.selectedTriggerId === id ? null : state.selectedTriggerId,
+        lastTriggerUndo: shouldResetUndo ? null : state.lastTriggerUndo,
+        canUndoTriggerChange: shouldResetUndo ? false : state.canUndoTriggerChange,
+      }
+    }),
+  setTriggerUndoSnapshot: (id) =>
+    set((state) => {
+      const trigger = state.triggers.find((t) => t.id === id)
+      if (!trigger) return {}
+      return {
+        lastTriggerUndo: {
+          id: trigger.id,
+          position: [...trigger.position] as [number, number],
+          size: [...trigger.size] as [number, number],
+          radius: trigger.radius,
+          rotationY: trigger.rotationY,
+          shape: trigger.shape,
+          onEnterActionId: trigger.onEnterActionId,
+          onExitActionId: trigger.onExitActionId,
+          cooldownSec: trigger.cooldownSec,
+          once: trigger.once,
+        },
+        canUndoTriggerChange: true,
+      }
+    }),
+  undoLastTriggerChange: () =>
+    set((state) => {
+      const snapshot = state.lastTriggerUndo
+      if (!snapshot) return {}
+
+      const idx = state.triggers.findIndex((t) => t.id === snapshot.id)
+      if (idx < 0) {
+        return { lastTriggerUndo: null, canUndoTriggerChange: false }
+      }
+
+      const updated = [...state.triggers]
+      updated[idx] = {
+        ...updated[idx],
+        position: [...snapshot.position],
+        size: [...snapshot.size],
+        radius: snapshot.radius,
+        rotationY: snapshot.rotationY,
+        shape: snapshot.shape,
+        onEnterActionId: snapshot.onEnterActionId,
+        onExitActionId: snapshot.onExitActionId,
+        cooldownSec: snapshot.cooldownSec,
+        once: snapshot.once,
+      }
+      saveTriggers(updated)
+
+      return {
+        triggers: updated,
+        selectedTriggerId: snapshot.id,
+        lastTriggerUndo: null,
+        canUndoTriggerChange: false,
+      }
+    }),
+  updateTrigger: (id, patch, options) =>
+    set((state) => {
+      const current = state.triggers.find((t) => t.id === id)
+      if (!current) return {}
+
+      const updated = state.triggers.map((t) => (t.id === id ? { ...t, ...patch } : t))
+      saveTriggers(updated)
+
+      const shouldRecordUndo = options?.recordUndo ?? true
+      if (!shouldRecordUndo) {
+        return { triggers: updated }
+      }
+
+      return {
+        triggers: updated,
+        lastTriggerUndo: {
+          id: current.id,
+          position: [...current.position] as [number, number],
+          size: [...current.size] as [number, number],
+          radius: current.radius,
+          rotationY: current.rotationY,
+          shape: current.shape,
+          onEnterActionId: current.onEnterActionId,
+          onExitActionId: current.onExitActionId,
+          cooldownSec: current.cooldownSec,
+          once: current.once,
+        },
+        canUndoTriggerChange: true,
+      }
+    }),
+  selectTrigger: (id) => set({ selectedTriggerId: id }),
   addPlacedModel: (model) =>
     set((state) => {
       const updated = [...state.placedModels, model]
@@ -740,6 +962,7 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
         spriteSetup: state.spriteSetup,
         contentAreas: state.contentAreas,
         colliders: state.colliders,
+        triggers: state.triggers,
         linkedClickZones: state.linkedClickZones,
         placedModels: state.placedModels,
       }
@@ -760,6 +983,7 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
               spriteSetup: state.spriteSetup,
               contentAreas: state.contentAreas,
               colliders: state.colliders,
+              triggers: state.triggers,
               linkedClickZones: state.linkedClickZones,
               placedModels: state.placedModels,
             }
@@ -776,6 +1000,7 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
       // Persist all individual keys so page reloads also use the correct data
       saveSpriteSetup(garden.spriteSetup)
       saveColliders(garden.colliders)
+      saveTriggers(garden.triggers ?? [])
       savePlacedModels(garden.placedModels ?? [])
       saveLinkedClickZones(garden.linkedClickZones)
 
@@ -805,6 +1030,7 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
         spriteSetup: garden.spriteSetup,
         contentAreas: garden.contentAreas,
         colliders: garden.colliders,
+        triggers: garden.triggers ?? [],
         linkedClickZones: garden.linkedClickZones,
         placedModels: garden.placedModels ?? [],
         activeGardenId: id,
@@ -812,6 +1038,9 @@ export const useGardenStore = create<GardenStoreState>((set) => ({
         selectedColliderId: null,
         lastColliderUndo: null,
         canUndoColliderChange: false,
+        selectedTriggerId: null,
+        lastTriggerUndo: null,
+        canUndoTriggerChange: false,
         selectedPlacedModelId: null,
       }
     }),

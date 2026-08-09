@@ -9,6 +9,9 @@ import { WorldContentManager } from '../content/WorldContentManager'
 import { GardenModels } from '../models/GardenModels'
 import { PlacedModels } from '../models/PlacedModels'
 import { ColliderSystem } from '../world/ColliderSystem'
+import { TriggerSystem } from '../world/TriggerSystem'
+import { TriggerRuntime } from '../world/TriggerRuntime'
+import { Turntable } from '../content/Turntable'
 import { useGardenStore } from '../store/gardenStore'
 
 export function Scene() {
@@ -27,6 +30,9 @@ export function Scene() {
       <Character />
       <WorldContentManager />
       <ColliderSystem />
+      <TriggerSystem />
+      <TriggerRuntime />
+      <Turntable position={[-52, 0, -52]} />
       <EffectComposer autoClear={false}>
         <Outline blur visibleEdgeColor={0x000000} edgeStrength={40} width={1000} />
       </EffectComposer>
